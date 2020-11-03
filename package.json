@@ -6,7 +6,8 @@
     "electron": "^10.1.5"
   },
   "scripts": {
-    "start": "electron ."
+    "start": "APP_DEV=true electron .",
+    "make-win": "electron-packager . --platform=win32 --arch=x64 --prune=true --out=release-builds"
   },
   "dependencies": {
     "bootstrap": "^4.5.3",

@@ -1,4 +1,5 @@
-process.env.NODE_ENV = 'development'; // production
+const isDev = process.env.APP_DEV ? (process.env.APP_DEV.trim() == "true") : false;
+
 global.settings = {};
 let timerCur; // текущее значение таймера
 let groupCur; // текущая группа пилотов
@@ -87,7 +88,7 @@ main.on('ready', function() {
     mainWindow.loadFile('./public/index.html');
 
     // Открываем DevTools.
-    if (process.env.NODE_ENV === 'development') {
+    if (isDev) {
         mainWindow.webContents.openDevTools();
     }
 
@@ -186,6 +187,7 @@ ipcMain.handle( 'submit-race', async (event, arg)=> {
     store.set('prepareTimer', arg['prepareTimer']);
     store.set('raceLoops', arg['raceLoops']);
     raceLoop=0;
+    if( global.settings.groups.length===0) return 0;
     return 1;
 });
 
@@ -224,13 +226,14 @@ function initializeClock(id, counter, endFunc = function(){return 0}) {
 function startRace() {
     console.log('start: '+global.settings.raceTimer);
     mainWindow.webContents.send('show-race');
-    if( global.settings.sound ) {
-        delay(5000, 1).then(res => {
+    if ( global.settings.raceTimer !==0) {
+        if (global.settings.sound) {
+            delay(5000, 1).then(res => {
+                initializeClock('race-timer', global.settings.raceTimer, finishRace)
+            });
+        } else {
             initializeClock('race-timer', global.settings.raceTimer, finishRace)
-        });
-    }
-    else{
-        initializeClock('race-timer', global.settings.raceTimer, finishRace)
+        }
     }
 
 }
@@ -285,6 +288,7 @@ function startPrerace(group){
 
 function preparePilots(pilotsObj) {
     let pilotsG = [];
+    if( pilotsObj === undefined ) return pilotsG;
     for (let i = 0; i < pilotsObj.length; i++) {
         if( i<4 ){
             if( pilotsObj[i+pilotsObj.length-4]['Name']!==undefined)

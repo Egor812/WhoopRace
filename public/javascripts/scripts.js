@@ -39,7 +39,8 @@ function prerace(group=0) {
 
     $('#race-timer').hide();
     clockElm = $('#prepare-timer');
-    clockElm.text(settings.prepareTimer);
+    if( settings.prepareTimer===0 ) clockElm.text('');
+    else clockElm.text(settings.prepareTimer);
     clockElm.show();
 
     let pagination='<ul class="pagination">';
@@ -159,12 +160,15 @@ window.setup = window.setup || {},
                 let raceLoops = Number($('#inputLoops').val());
                 const args = {judges: judges, sound: sound, prepareTimer: prepareTimer, raceTimer : raceTimer, raceLoops: raceLoops};
                 console.log(args);
-                $('#menu').hide();
                 //ipcRenderer.sendSync('submit-race',args);
 
                 ipcRenderer.invoke('submit-race', args).then( result => {
-                    ipcRenderer.send('start-prerace',{ group : 0 });
-                    $('#race').show();
+                    if( result ) {
+                        $('#menu').hide();
+                        ipcRenderer.send('start-prerace', {group: 0});
+                        $('#race').show();
+                    }
+                    else alert('Загрузите пилотов')
                 });
 
             },

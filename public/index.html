@@ -51,8 +51,80 @@
       <label for="inputLoops" class="col-form-label">Количество повторов (если время на гонку не 0)</label>
     </div>
     <button id="submit-race" type="button" class="btn btn-primary">Создать гонку</button>
-  </div>
+    <div id="help" style="padding-top: 3em;">
+      <div id="showBestChannels">
+        <a href="#" onclick="$('#showBestChannels > div.row').toggle()">Наилучшие сочетания каналов</a>
+        <div class="row helptable" style="display: none; width:20em;">
+          <div class="col">1</div>
+          <div class="col">2</div>
+          <div class="col">5</div>
+          <div class="col">6</div>
+          <div class="w-100"></div>
+          <div class="col">1</div>
+          <div class="col">2</div>
+          <div class="col">6</div>
+          <div class="col">7</div>
+          <div class="w-100"></div>
+          <div class="col">1</div>
+          <div class="col">2</div>
+          <div class="col">7</div>
+          <div class="col">8</div>
+          <div class="w-100"></div>
+          <div class="col">1</div>
+          <div class="col">3</div>
+          <div class="col">6</div>
+          <div class="col">8</div>
+          <div class="w-100"></div>
+          <div class="col">1</div>
+          <div class="col">4</div>
+          <div class="col">5</div>
+          <div class="col">6</div>
+          <div class="w-100"></div>
+          <div class="col">2</div>
+          <div class="col">3</div>
+          <div class="col">6</div>
+          <div class="col">7</div>
+          <div class="w-100"></div>
+          <div class="col">2</div>
+          <div class="col">3</div>
+          <div class="col">7</div>
+          <div class="col">8</div>
+          <div class="w-100"></div>
+          <div class="col">3</div>
+          <div class="col">4</div>
+          <div class="col">7</div>
+          <div class="col">8</div>
+          <div class="w-100"></div>
+          <br>
+        </div>
+      </div>
+      <div id="showRaceband">
+        <a href="#" onclick="$('#showRaceband > div.row').toggle()">Частоты Raceband</a>
+        <div class="row" style="display: none;">
+          <div class="col">1</div>
+          <div class="col">2</div>
+          <div class="col">3</div>
+          <div class="col">4</div>
+          <div class="col">5</div>
+          <div class="col">6</div>
+          <div class="col">7</div>
+          <div class="col">8</div>
+          <div class="w-100"></div>
+          <div class="col">5658</div>
+          <div class="col">5695</div>
+          <div class="col">5732</div>
+          <div class="col">5769</div>
+          <div class="col">5806</div>
+          <div class="col">5843</div>
+          <div class="col">5880</div>
+          <div class="col">5917</div>
+          <div class="w-100"></div>
+        </div>
+      </div>
+      <a href="#" id="getXLSTemplate">Получить XLS шаблон</a>
 
+    </div>
+  </div>
 </div>
 
 
@@ -100,83 +172,6 @@
   <div id='stop-race' style="position:absolute; top:0; right:0; cursor:pointer">X</div>
 </div>
 
-<div class="modal fade" id="exampleModal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
-  <div class="modal-body">
-    ...
-  </div>
-</div>
-
-<div id="help" style="padding-top: 3em;">
-<div id="showBestChannels">
-  <a href="#" onclick="$('#showBestChannels > div.row').toggle()">Наилучшие сочетания каналов</a>
-  <div class="row helptable" style="display: none; width:20em;">
-    <div class="col">1</div>
-    <div class="col">2</div>
-    <div class="col">5</div>
-    <div class="col">6</div>
-    <div class="w-100"></div>
-    <div class="col">1</div>
-    <div class="col">2</div>
-    <div class="col">6</div>
-    <div class="col">7</div>
-    <div class="w-100"></div>
-    <div class="col">1</div>
-    <div class="col">2</div>
-    <div class="col">7</div>
-    <div class="col">8</div>
-    <div class="w-100"></div>
-    <div class="col">1</div>
-    <div class="col">3</div>
-    <div class="col">6</div>
-    <div class="col">8</div>
-    <div class="w-100"></div>
-    <div class="col">1</div>
-    <div class="col">4</div>
-    <div class="col">5</div>
-    <div class="col">6</div>
-    <div class="w-100"></div>
-    <div class="col">2</div>
-    <div class="col">3</div>
-    <div class="col">6</div>
-    <div class="col">7</div>
-    <div class="w-100"></div>
-    <div class="col">2</div>
-    <div class="col">3</div>
-    <div class="col">7</div>
-    <div class="col">8</div>
-    <div class="w-100"></div>
-    <div class="col">3</div>
-    <div class="col">4</div>
-    <div class="col">7</div>
-    <div class="col">8</div>
-    <div class="w-100"></div>
-    <br>
-  </div>
-</div>
-<div id="showRaceband">
-  <a href="#" onclick="$('#showRaceband > div.row').toggle()">Частоты Raceband</a>
-  <div class="row" style="display: none;">
-    <div class="col">1</div>
-    <div class="col">2</div>
-    <div class="col">3</div>
-    <div class="col">4</div>
-    <div class="col">5</div>
-    <div class="col">6</div>
-    <div class="col">7</div>
-    <div class="col">8</div>
-    <div class="w-100"></div>
-    <div class="col">5658</div>
-    <div class="col">5695</div>
-    <div class="col">5732</div>
-    <div class="col">5769</div>
-    <div class="col">5806</div>
-    <div class="col">5843</div>
-    <div class="col">5880</div>
-    <div class="col">5917</div>
-    <div class="w-100"></div>
-  </div>
-</div>
-  <a href="#" id="getXLSTemplate">Получить XLS шаблон</a>
 
 </body>
 <script>window.$ = window.jQuery = require('jquery');</script>
