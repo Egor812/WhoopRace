@@ -1,0 +1,86 @@
+body {
+  padding: 50px;
+  font-family: "Lucida Grande", Helvetica, Arial, sans-serif;
+  margin:10px 250px;
+  background: black;
+  color: white;
+}
+
+a {
+  color: #00B7FF;
+}
+
+.setup-pilots-badge{
+  margin: 5px 5px 5px 5px;
+  padding: 5px 10px 5px 10px;
+}
+
+.pilots{
+  padding: 15px;
+  background: navy;
+  border-radius: 6px;
+  margin:1em;
+}
+
+.pilots > .name {
+  font-size: 2em;
+  font-weight: bold;
+}
+
+.pilots > .ch{
+  margin:3px;
+}
+
+.pilots > .judge{
+  margin:3px;
+}
+
+.top {
+  position: absolute;
+  top: 0;
+  right: 0;
+}
+
+.bottom {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+}
+
+#prepare-timer{
+  color: lightskyblue;
+}
+
+#race-timer{
+  color: red;
+}
+
+.timer{
+  font-size: 12em;
+  text-align: center;
+  font-weight: bold;
+}
+
+.pagination-dark{
+  background:black;
+  border: 1px solid #4976a4;
+}
+
+#group-pilots{
+  padding:1em
+}
+
+#group-next{
+color:lightgray;
+  padding: 1em 0 1em 0;
+  font-size: 1.5em;
+}
+
+#pagination{
+  position: absolute;
+  bottom: 0;
+}
+
+.helptable > .col{
+  border-bottom: 1px solid rgb(124 61 61);
+}

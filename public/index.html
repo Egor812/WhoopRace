@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <title>Whoop Race</title>
+  <link rel="stylesheet" href="./stylesheets/bootstrap.min.css">
+  <link rel="stylesheet" href="./stylesheets/style.css">
+</head>
+
+<body>
+<div class="audio">
+  <audio id="wav-counter" src="./data/count.wav" preload="auto"></audio>
+  <audio id="wav-finish" src="./data/finish.wav" preload="auto"></audio>
+</div>
+
+<div id="menu">
+  <h1>Whoop Race</h1>
+
+  <div id="alert-message" class="alert alert-primary" role="alert" style="display: none"></div>
+
+  <div id="load-pilots" style="margin-top:1em; margin-bottom:2em">
+    <button type="button" class="btn btn-outline-primary btn-sm" id="showOpendialog">Загрузить XLS с пилотами</button>
+  </div>
+
+  <div id="list-pilots" style="display:block;">  </div>
+
+  <div id="settings">
+    <div class="form-group form-check">
+      <input type="checkbox" class="form-check-input" id="checkbox-judge">
+      <label class="form-check-label" for="checkbox-judge">Судьи из зала</label>
+    </div>
+    <div class="form-group form-check">
+      <input type="checkbox" class="form-check-input" id="checkbox-start-sound">
+      <label class="form-check-label" for="checkbox-start-sound">Звук старта и финиша</label>
+    </div>
+    <div class="form-group row">
+      <div class="col-2"  style="min-width: 7em;">
+        <input type="number" class="form-control" id="inputPrepareTime">
+      </div>
+      <label for="inputPrepareTime" class="col-form-label">Время на подготовку</label>
+    </div>
+    <div class="form-group row">
+      <div class="col-2" style="min-width: 7em;">
+        <input type="number" class="form-control" id="inputRaceTime">
+      </div>
+      <label for="inputRaceTime" class="col-form-label">Время на гонку (если используется TVP - 0)</label>
+    </div>
+    <div class="form-group row">
+      <div class="col-2" style="min-width: 7em;">
+        <input type="number" class="form-control" id="inputLoops">
+      </div>
+      <label for="inputLoops" class="col-form-label">Количество повторов (если время на гонку не 0)</label>
+    </div>
+    <button id="submit-race" type="button" class="btn btn-primary">Создать гонку</button>
+  </div>
+
+</div>
+
+
+<div id="race" style="display: none">
+  <div id="group" class="badge badge-info" style="font-size: 1.5em;text-align: right;margin-bottom: 0;">
+  </div>
+  <div id="group-pilots" class="row">
+      <div id="pilot-1" class="pilots col">
+        <span class='name'></span>
+        <span class="ch top badge badge-pill badge-warning"></span>
+        <span class="judge bottom"></span>
+      </div>
+      <div id="pilot-2" class="pilots col">
+        <span class='name'></span>
+        <span class="ch top badge badge-pill badge-warning"></span>
+        <span class="judge bottom"></span>
+      </div>
+      <div class="w-100"></div>
+      <div id="pilot-3" class="pilots col">
+        <span class='name'></span>
+        <span class="ch top badge badge-pill badge-warning"></span>
+        <span class="judge bottom"></span>
+      </div>
+      <div id="pilot-4" class="pilots col">
+        <span class='name'></span>
+        <span class="ch top badge badge-pill badge-warning"></span>
+        <span class="judge bottom"></span>
+      </div>
+  </div>
+  <div class="row justify-content-md-center">
+    <div id="group-next">
+      Готовятся:
+      <span id="pilot-next-1" class="badge badge-secondary"></span>
+      <span id="pilot-next-2" class="badge badge-secondary"></span>
+      <span id="pilot-next-3" class="badge badge-secondary"></span>
+      <span id="pilot-next-4" class="badge badge-secondary"></span>
+    </div>
+  </div>
+    <div id="prepare-timer" class="timer"></div>
+    <div id="race-timer" class="timer"></div>
+
+  <div class="row justify-content-md-center">
+    <div id="pagination"></div>
+  </div>
+  <div id='stop-race' style="position:absolute; top:0; right:0; cursor:pointer">X</div>
+</div>
+
+<div class="modal fade" id="exampleModal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
+  <div class="modal-body">
+    ...
+  </div>
+</div>
+
+<div id="help" style="padding-top: 3em;">
+<div id="showBestChannels">
+  <a href="#" onclick="$('#showBestChannels > div.row').toggle()">Наилучшие сочетания каналов</a>
+  <div class="row helptable" style="display: none; width:20em;">
+    <div class="col">1</div>
+    <div class="col">2</div>
+    <div class="col">5</div>
+    <div class="col">6</div>
+    <div class="w-100"></div>
+    <div class="col">1</div>
+    <div class="col">2</div>
+    <div class="col">6</div>
+    <div class="col">7</div>
+    <div class="w-100"></div>
+    <div class="col">1</div>
+    <div class="col">2</div>
+    <div class="col">7</div>
+    <div class="col">8</div>
+    <div class="w-100"></div>
+    <div class="col">1</div>
+    <div class="col">3</div>
+    <div class="col">6</div>
+    <div class="col">8</div>
+    <div class="w-100"></div>
+    <div class="col">1</div>
+    <div class="col">4</div>
+    <div class="col">5</div>
+    <div class="col">6</div>
+    <div class="w-100"></div>
+    <div class="col">2</div>
+    <div class="col">3</div>
+    <div class="col">6</div>
+    <div class="col">7</div>
+    <div class="w-100"></div>
+    <div class="col">2</div>
+    <div class="col">3</div>
+    <div class="col">7</div>
+    <div class="col">8</div>
+    <div class="w-100"></div>
+    <div class="col">3</div>
+    <div class="col">4</div>
+    <div class="col">7</div>
+    <div class="col">8</div>
+    <div class="w-100"></div>
+    <br>
+  </div>
+</div>
+<div id="showRaceband">
+  <a href="#" onclick="$('#showRaceband > div.row').toggle()">Частоты Raceband</a>
+  <div class="row" style="display: none;">
+    <div class="col">1</div>
+    <div class="col">2</div>
+    <div class="col">3</div>
+    <div class="col">4</div>
+    <div class="col">5</div>
+    <div class="col">6</div>
+    <div class="col">7</div>
+    <div class="col">8</div>
+    <div class="w-100"></div>
+    <div class="col">5658</div>
+    <div class="col">5695</div>
+    <div class="col">5732</div>
+    <div class="col">5769</div>
+    <div class="col">5806</div>
+    <div class="col">5843</div>
+    <div class="col">5880</div>
+    <div class="col">5917</div>
+    <div class="w-100"></div>
+  </div>
+</div>
+  <a href="#" id="getXLSTemplate">Получить XLS шаблон</a>
+
+</body>
+<script>window.$ = window.jQuery = require('jquery');</script>
+<script src="./javascripts/scripts.js"></script>
+</html>

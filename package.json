@@ -1,0 +1,18 @@
+{
+  "name": "whooprace.app",
+  "version": "0.0.0",
+  "main": "main.js",
+  "devDependencies": {
+    "electron": "^10.1.5"
+  },
+  "scripts": {
+    "start": "electron ."
+  },
+  "dependencies": {
+    "bootstrap": "^4.5.3",
+    "electron-store": "^6.0.1",
+    "jquery": "^3.5.1",
+    "node-osc": "^5.2.1",
+    "xlsx": "^0.16.8"
+  }
+}
