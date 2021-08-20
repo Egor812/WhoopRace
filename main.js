@@ -1,15 +1,17 @@
-const isDev = process.env.APP_DEV ? (process.env.APP_DEV.trim() == "true") : false;
+const isDev = process.env.APP_DEV ? (process.env.APP_DEV.trim() === "true") : false;
 
 global.settings = {};
 let timerCur; // текущее значение таймера
 let groupCur; // текущая группа пилотов
 let timeInterval; // таймер race и prerace
 let raceLoop=0; // номер прохода через все группы;
+let inRace = 0; // сейчас запущена гонка
 
 const electron = require('electron');
 const main = electron.app;  // Модуль контролирующей жизненный цикл нашего приложения.
 const BrowserWindow = electron.BrowserWindow;  // Модуль создающий браузерное окно.
 
+// Настройки
 const Store = require('electron-store'); // https://www.npmjs.com/package/electron-store
 const schema = {
     judges: {
@@ -18,7 +20,7 @@ const schema = {
         minimum: 0,
         default: 0
     },
-    sound: {
+    withoutTVP: {
         type: 'number',
         maximum: 1,
         minimum: 0,
@@ -36,27 +38,61 @@ const schema = {
         minimum: 0,
         default: 0
     },
+    raceLaps: {
+        type: 'number',
+        maximum: 100,
+        minimum: 0,
+        default: 0
+    },
     raceLoops: {
         type: 'number',
         maximum: 1000,
         minimum: 0,
         default: 0
     },
-    /*pilots: {
-        type: 'object'
-    }*/
+    obsUse: {
+        type: 'number',
+        maximum: 1,
+        minimum: 0,
+        default: 0
+    },
+    multiGp: {
+        type: 'number',
+        maximum: 1,
+        minimum: 0,
+        default: 1
+    }
 };
 const store = new Store({schema});
-global.settings.judges = store.get('judges', 0);
-global.settings.sound = store.get('sound', 0);
-global.settings.prepareTimer = store.get('prepareTimer', 120);
-global.settings.raceTimer = store.get('raceTimer', 0);
-global.settings.pilots = store.get('pilots');
-global.settings.raceLoops = store.get('raceLoops', 0);
-global.settings.groups = preparePilots(global.settings.pilots);
+loadSettings();
 
+// Общение с TVP
 const osc = require('node-osc');
 const client = new osc.Client('127.0.0.1', 4000);
+
+const oscServer = new osc.Server(4001, '127.0.0.1', () => {
+    console.log('OSC Server is listening');
+});
+
+oscServer.on('message', function (msg) {
+    console.log(`OSC RX: ${msg}` );
+    msg.forEach(el => console.table(el));
+    if( inRace===1 && !global.settings.withoutTVP && String(msg) == '/racefinished' ) {
+        finishRace();
+        console.log('Finish message accepted');
+    }
+    //oscServer.close();
+});
+
+// Общение с OBS
+// https://github.com/haganbmj/obs-websocket-js
+const OBSWebSocket = require('obs-websocket-js');
+const obs = new OBSWebSocket();
+
+// You must add this handler to avoid uncaught exceptions.
+obs.on('error', err => {
+    console.error('socket error:', err);
+});
 
 // Определение глобальной ссылки , если мы не определим, окно
 // окно будет закрыто автоматически когда JavaScript объект будет очищен сборщиком мусора.
@@ -104,6 +140,9 @@ main.on('ready', function() {
 
 const { ipcMain, dialog } = require('electron');
 
+/*
+Событие - открытие файла с пилотами
+ */
 ipcMain.on('show-open-dialog', (event, arg)=> {
 
     const options = {
@@ -124,6 +163,9 @@ ipcMain.on('show-open-dialog', (event, arg)=> {
     })
 });
 
+/*
+Событие - Получить шаблон таблицы для регистрации участников
+ */
 ipcMain.on( 'get-xls-tpl', (event, arg)=> {
     console.log('start');
     const XLSX = require('xlsx'); // https://github.com/SheetJS/sheetjs
@@ -162,6 +204,40 @@ ipcMain.on( 'get-xls-tpl', (event, arg)=> {
 
 });
 
+/*
+Событие - Создать необходимые каналы в OBS
+ */
+ipcMain.handle( 'obsCreateScenes', async (event, arg)=> {
+    obs.connect({
+        address: 'localhost:' + arg['port'],
+        password: arg['pass']
+    })
+    .then( obs.send('CreateScene', {'sceneName': arg['TVP']}))
+    .then( obs.send('CreateScene', {'sceneName': arg['WR']}))
+    .then( obs.send('CreateScene', {'sceneName': arg['Break']}))
+    .then( obs.disconnect());
+});
+
+/*
+Событие - Проверить соединение с OBS
+ */
+ipcMain.handle( 'obsCheckConnection', async (event, arg)=> {
+    // await - ждем результата
+    const res = await obs.connect({
+            address: 'localhost:' + arg['port'],
+            password: arg['pass']
+    }).then(() => {
+        obs.disconnect();
+        return 1;
+    }).catch((error) => {
+        console.error(error);
+        return 0;
+    });
+    client.send( '/v1/camera/1/label','param');
+    console.log( 'OBS connection: '+res);
+    return res;
+});
+
 
 ipcMain.handle( 'parse-xls', async (event, arg)=> {
     const XLSX = require('xlsx'); // https://github.com/SheetJS/sheetjs
@@ -175,23 +251,37 @@ ipcMain.handle( 'parse-xls', async (event, arg)=> {
     return groups;
 });
 
+/*
+Событие - запуск гонок
+ */
 ipcMain.handle( 'submit-race', async (event, arg)=> {
-    global.settings.judges=arg['judges'];
-    global.settings.sound=arg['sound'];
-    global.settings.prepareTimer=arg['prepareTimer'];
-    global.settings.raceTimer=arg['raceTimer'];
-    global.settings.raceLoops=arg['raceLoops'];
-    store.set('judges', arg['judges']);
-    store.set('sound', arg['sound']);
-    store.set('raceTimer', arg['raceTimer']);
-    store.set('prepareTimer', arg['prepareTimer']);
-    store.set('raceLoops', arg['raceLoops']);
+    if( !setSettings(arg) ) return 0;
+    saveSettings(arg);
     raceLoop=0;
-    if( global.settings.groups.length===0) return 0;
+    if( !arg['withoutTVP']){
+        sendRaceDuration(global.settings.raceTimer);
+        sendRaceLaps(global.settings.raceLaps);
+    }
+    if( arg['obsUse'] ){
+        connectObs(arg['obsPort'], arg['obsPassword']);
+    }
+
     return 1;
 });
 
 
+/*
+Событие - Сохранить настройки с формы
+ */
+ipcMain.handle( 'save-settings', async (event, arg)=> {
+    if( !setSettings(arg) ) return 0;
+    saveSettings(arg);
+    return 1;
+});
+
+/*
+Приглашение пилотов
+ */
 ipcMain.on( 'start-prerace', (event, arg)=> {
     let group = arg['group'];
     if( group<0 ) group = global.settings.groups.length-1;
@@ -206,6 +296,7 @@ ipcMain.handle( 'stop-race', async (event, arg)=> {
 });
 
 
+// TODO сделать так? : единственный таймер всегда считает секунды. Меняются только отсчитываемые интервалы. Избавлюсь от рекурсии.
 function initializeClock(id, counter, endFunc = function(){return 0}) {
 
     function updateClock() {
@@ -216,23 +307,33 @@ function initializeClock(id, counter, endFunc = function(){return 0}) {
             endFunc();
             //timerCur = 0;
         }
-        console.log(timerCur);
+        //console.log(timerCur);
     }
     timerCur = counter;
     timeInterval = setInterval(updateClock, 1000);
 }
 
-// старт гонки
+/*
+ старт гонки
+ */
 function startRace() {
-    console.log('start: '+global.settings.raceTimer);
+    console.log( 'Start G'+(groupCur+1)+'/'+global.settings.groups.length+' L'+(raceLoop+1)+'/'+global.settings.raceLoops);
+
+    if( global.settings.obsUse && !global.settings.withoutTVP ) {
+        changeSceneObs( global.settings.obsSceneTVP);
+    }
     mainWindow.webContents.send('show-race');
+    if( !global.settings.withoutTVP){
+        sendStartCommand();
+    }
+    inRace = 1; // после команды на старт!
     if ( global.settings.raceTimer !==0) {
-        if (global.settings.sound) {
+        if (global.settings.withoutTVP) {
             delay(5000, 1).then(res => {
                 initializeClock('race-timer', global.settings.raceTimer, finishRace)
             });
         } else {
-            initializeClock('race-timer', global.settings.raceTimer, finishRace)
+            // ждем сообщение от TVP
         }
     }
 
@@ -245,30 +346,38 @@ function startRace() {
 }*/
 
 function finishRace() {
-    console.log('finish');
+    inRace = 0;
+    console.log('Finish G'+(groupCur+1)+'/'+global.settings.groups.length+' L'+(raceLoop+1)+'/'+global.settings.raceLoops);
     mainWindow.webContents.send('finish');
     let groupNext = groupCur+1;
     if( groupNext>=global.settings.groups.length) {
         groupNext=0;
+        raceLoop++;
         if( global.settings.raceLoops ) {
-            raceLoop++;
             if(raceLoop>=global.settings.raceLoops) return;
         }
     }
     //const nextGroup = nextGroup(groupCur, global.settings.groups.length);
+    /*todo if( global.settings.multiGp ) showResultsPre(); */
+
     startPrerace( groupNext );
     mainWindow.webContents.send('show-prerace', { group : groupNext });
 }
 
 
 function startPrerace(group){
-    console.log( 'startPrerace:'+group);
+    if( global.settings.obsUse ) {
+        changeSceneObs( global.settings.obsSceneWR);
+    }
+    console.log( 'Invitation G'+(group+1)+'/'+global.settings.groups.length+' L'+(raceLoop+1)+'/'+global.settings.raceLoops);
     clearInterval(timeInterval);
     groupCur = group;
 
     // отправить пилотов в TVP
-    for( let i=0; i<global.settings.groups[group].length; i++){
-        sendPilotName(i+1, global.settings.groups[group][i]['Name']);
+    if( !global.settings.withoutTVP ) {
+        for (let i = 0; i < global.settings.groups[group].length; i++) {
+            sendPilotName(i + 1, global.settings.groups[group][i]['Name']);
+        }
     }
 
     if(  global.settings.prepareTimer!==0 )  {
@@ -314,13 +423,33 @@ function preparePilots(pilotsObj) {
     return pilotsG;
 }
 
+/*
+Отправить сообщение OSC
+ */
 const sendOsc = function (addr, arg1) {
-    console.log('sendOSc: ' + addr + ' ' + arg1);
+    console.log('OSC TX: ' + addr + ' ' + arg1);
     client.send(addr, arg1);
 };
+
+/*
+Отправить имя пилота в TVP
+ */
 const sendPilotName = function (camid, name) {
     sendOsc('/v1/camera/' + camid + '/label', name);
 };
+
+const sendStartCommand = function () {
+    sendOsc('/v1/startrace', 1);
+};
+
+const sendRaceDuration = function (sec) {
+    sendOsc('/v1/setdurasecs', sec);
+};
+
+const sendRaceLaps = function (num) {
+    sendOsc('/v1/setduralaps', num);
+};
+
 
 /**
  * Delays resolution of a Promise by [time] amount, resolving [value]
@@ -337,4 +466,109 @@ function delay(time, value) {
 
 function isNumber(value) {
     return typeof value === 'number' && isFinite(value);
+}
+
+function connectObs(port, pass) {
+    obs.connect({
+        address: 'localhost:'+port,
+        password: pass
+    })
+        .then(() => {
+            console.log(`OBS: We're connected & authenticated.`);
+
+            return obs.send('GetSceneList');
+        })
+        .then(data => {
+            console.log(`${data.scenes.length} Available Scenes!`);
+            console.log('Using promises:', data);
+
+            /*data.scenes.forEach(scene => {
+                if (scene.name !== data.currentScene) {
+                    console.log(`Found a different scene! Switching to Scene: ${scene.name}`);
+
+                    obs.send('SetCurrentScene', {
+                        'scene-name': scene.name
+                    });
+                }
+            });*/
+        })
+        .catch(err => { // Promise convention dicates you have a catch on every chain.
+            console.log(err);
+        });
+
+    // увидели событие - смена сцены
+    obs.on('SwitchScenes', data => {
+        console.log(`New Active Scene: ${data.sceneName}`);
+    });
+}
+
+/*
+OBS - сменить сцену
+ */
+function changeSceneObs(name) {
+    obs.send('SetCurrentScene', {
+        'scene-name': name
+    });
+}
+
+
+/*
+Загрузка настроек из хранилища
+ */
+function loadSettings() {
+    global.settings.judges = store.get('judges', 0);
+    global.settings.withoutTVP = store.get('withoutTVP', 0);
+    global.settings.prepareTimer = store.get('prepareTimer', 120);
+    global.settings.raceTimer = store.get('raceTimer', 0);
+    global.settings.raceLaps = store.get('raceLaps', 0);
+    global.settings.pilots = store.get('pilots');
+    global.settings.raceLoops = store.get('raceLoops', 0);
+    global.settings.groups = preparePilots(global.settings.pilots);
+    global.settings.obsUse = store.get('obsUse', 0);
+    global.settings.obsPort = store.get('obsPort', 4444);
+    global.settings.obsPassword = store.get('obsPassword', '1234');
+    global.settings.obsSceneTVP = store.get('obsSceneTVP', 'tvp');
+    global.settings.obsSceneWR = store.get('obsSceneWR', 'wr');
+    global.settings.obsSceneBreak = store.get('obsSceneBreak', 'break');
+    global.settings.obsUse = store.get('multiGp', 1);
+}
+
+/*
+Запись значения настроек
+ */
+function setSettings(arg) {
+    global.settings.judges=arg['judges'];
+    global.settings.withoutTVP=arg['withoutTVP'];
+    global.settings.multiGp=arg['multiGp'];
+    global.settings.prepareTimer=arg['prepareTimer'];
+    global.settings.raceTimer=arg['raceTimer'];
+    global.settings.raceLaps=arg['raceLaps'];
+    global.settings.raceLoops=arg['raceLoops'];
+    global.settings.obsUse=arg['obsUse'];
+    global.settings.obsPort=arg['obsPort'];
+    global.settings.obsPassword=arg['obsPassword'];
+    global.settings.obsSceneTVP=arg['obsSceneTVP'];
+    global.settings.obsSceneWR=arg['obsSceneWR'];
+    global.settings.obsSceneBreak=arg['obsSceneBreak'];
+    if( global.settings.groups.length===0) return 0;
+    return 1;
+}
+
+/*
+Сохранение настроек в хранилище
+ */
+function saveSettings(arg) {
+    store.set('judges', arg['judges']);
+    store.set('withoutTVP', arg['withoutTVP']);
+    store.set('multiGp', arg['multiGp']);
+    store.set('raceTimer', arg['raceTimer']);
+    store.set('raceLaps', arg['raceLaps']);
+    store.set('prepareTimer', arg['prepareTimer']);
+    store.set('raceLoops', arg['raceLoops']);
+    store.set('obsUse', arg['obsUse']);
+    store.set('obsPort', arg['obsPort']);
+    store.set('obsPassword', arg['obsPassword']);
+    store.set('obsSceneTVP', arg['obsSceneTVP']);
+    store.set('obsSceneWR', arg['obsSceneWR']);
+    store.set('obsSceneBreak', arg['obsSceneBreak']);
 }

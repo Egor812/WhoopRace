@@ -1,5 +1,8 @@
 let clockElm;
 
+/*
+Страница приглашения пилотов
+ */
 function prerace(group=0) {
 
     let groups = settings.groups;
@@ -69,7 +72,7 @@ function race() {
     clockElm = $('#race-timer');
     clockElm.text(settings.raceTimer);
     clockElm.show();
-    if( settings.sound ) document.getElementById('wav-counter').play();
+    if( settings.withoutTVP ) document.getElementById('wav-counter').play();
 }
 
 function showPilotsAll(pilotsG) {
@@ -91,13 +94,50 @@ function showPilotsAll(pilotsG) {
     HTMLOUT.innerHTML = x;
 }
 
+/*
+Заполнение формы setup
+ */
 function setSettings(settings) {
     if( settings['judges'] ) $('#checkbox-judge').prop('checked', true);
-    if( settings['sound'] ) $('#checkbox-start-sound').prop('checked', true);
+    if( settings['withoutTVP'] ) $('#checkbox-without-tvp').prop('checked', true);
+    if( settings['obsUse'] ) $('#checkbox-obsUse').prop('checked', true);
+
+    $('#obsPort').val(settings.obsPort);
+    $('#obsPassword').val(settings.obsPassword);
+    $('#obsSceneTVP').val(settings.obsSceneTVP);
+    $('#obsSceneWR').val(settings.obsSceneWR);
+    $('#obsSceneBreak').val(settings.obsSceneBreak);
+
+
     $('#inputPrepareTime').val(settings.prepareTimer);
     $('#inputRaceTime').val(settings.raceTimer);
+    $('#inputRaceLaps').val(settings.raceLaps);
     $('#inputLoops').val(settings.raceLoops);
     showPilotsAll(settings.groups);
+}
+
+/*
+Получить данные формы настроек
+ */
+function getSettingsFromForm(){
+    let judges, withoutTVP, multiGp, obsUse;
+    if( $('#checkbox-judge').is(':checked') ) judges=1; else judges=0;
+    if( $('#checkbox-multigp').is(':checked') ) multiGp=1; else multiGp=0;
+    if( $('#checkbox-obsUse').is(':checked') ) obsUse=1; else obsUse=0;
+    if( $('#checkbox-without-tvp').is(':checked') ) withoutTVP=1; else withoutTVP=0;
+    let prepareTimer = Number($('#inputPrepareTime').val());
+    let raceTimer = Number($('#inputRaceTime').val());
+    let raceLaps = Number($('#inputRaceLaps').val());
+    let raceLoops = Number($('#inputLoops').val());
+    let obsPort = Number($('#obsPort').val());
+    let obsPassword = $('#obsPassword').val();
+    let obsSceneTVP = $('#obsSceneTVP').val();
+    let obsSceneWR = $('#obsSceneWR').val();
+    let obsSceneBreak = $('#obsSceneBreak').val();
+    const args = {judges: judges, withoutTVP: withoutTVP, prepareTimer: prepareTimer, raceTimer : raceTimer, raceLoops: raceLoops, multiGp: multiGp,
+        obsUse:obsUse, obsPort:obsPort, obsSceneTVP:obsSceneTVP, obsSceneWR:obsSceneWR, obsSceneBreak:obsSceneBreak, obsPassword:obsPassword, raceLaps:raceLaps};
+    console.log(args);
+    return args;
 }
 
 // IPC
@@ -112,7 +152,7 @@ ipcRenderer.on('timer-value', (event, arg)=> {
 });
 
 ipcRenderer.on('finish', (event, arg)=> {
-    if( settings.sound ) document.getElementById('wav-finish').play();
+    if( settings.withoutTVP ) document.getElementById('wav-finish').play();
 });
 
 ipcRenderer.on('show-race', (event, arg)=> {
@@ -151,15 +191,27 @@ window.setup = window.setup || {},
                 //readXLSX(paths);
             },
 
+            obsCreatScenes: function()
+            {
+                ipcRenderer.invoke('obsCreateScenes', {port: Number($('#obsPort').val()), pass:$('#obsPassword').val(), TVP: $('#obsSceneTVP').val(), WR: $('#obsSceneWR').val(), Break: $('#obsSceneBreak').val()})
+            },
+
+            obsCheckConnection: function()
+            {
+                ipcRenderer.invoke('obsCheckConnection', { port: Number($('#obsPort').val()), pass:$('#obsPassword').val() } )
+                    .then( result => { if ( result===1 ) alert('OK'); else alert('Error');});
+            },
+
+            saveSettings: function(){
+              const args = getSettingsFromForm();
+                ipcRenderer.invoke('save-settings', args).then( result => {
+                    alert('Сохранено')
+                });
+
+            },
+
             submitRace: function(){
-                let judges, sound;
-                if( $('#checkbox-judge').is(':checked') ) judges=1; else judges=0;
-                if( $('#checkbox-start-sound').is(':checked') ) sound=1; else sound=0;
-                let prepareTimer = Number($('#inputPrepareTime').val());
-                let raceTimer = Number($('#inputRaceTime').val());
-                let raceLoops = Number($('#inputLoops').val());
-                const args = {judges: judges, sound: sound, prepareTimer: prepareTimer, raceTimer : raceTimer, raceLoops: raceLoops};
-                console.log(args);
+                const args = getSettingsFromForm();
                 //ipcRenderer.sendSync('submit-race',args);
 
                 ipcRenderer.invoke('submit-race', args).then( result => {
@@ -195,6 +247,17 @@ window.setup = window.setup || {},
                 });
                 $('#getXLSTemplate').click( function () {
                     setup.handler.getXLSTemplate();
+                });
+                $('#obsCreatScenes').click( function () {
+                    setup.handler.obsCreatScenes();
+                    }
+                );
+                $('#obsCheckConnection').click( function () {
+                        setup.handler.obsCheckConnection();
+                    }
+                );
+                $('#save-settings').click( function () {
+                    setup.handler.saveSettings();
                 });
 
                 $('#submit-race').click( function () {

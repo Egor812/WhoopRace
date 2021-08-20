@@ -26,23 +26,17 @@
   <div id="settings">
     <div class="form-group form-check">
       <input type="checkbox" class="form-check-input" id="checkbox-judge">
-      <label class="form-check-label" for="checkbox-judge">Судьи из зала</label>
+      <label class="form-check-label" for="checkbox-judge" title="каждому пилоту назначаетя судья из других пилотов">Судьи из зала</label>
     </div>
     <div class="form-group form-check">
-      <input type="checkbox" class="form-check-input" id="checkbox-start-sound">
-      <label class="form-check-label" for="checkbox-start-sound">Звук старта и финиша</label>
+      <input type="checkbox" class="form-check-input" id="checkbox-multigp">
+      <label class="form-check-label" for="checkbox-multigp" title="Очки - количество пройденных за отведенное время кругов. После вылета будут выводиться промежуточные результаты.">MultyGP</label>
     </div>
     <div class="form-group row">
       <div class="col-2"  style="min-width: 7em;">
         <input type="number" class="form-control" id="inputPrepareTime">
       </div>
-      <label for="inputPrepareTime" class="col-form-label">Время на подготовку</label>
-    </div>
-    <div class="form-group row">
-      <div class="col-2" style="min-width: 7em;">
-        <input type="number" class="form-control" id="inputRaceTime">
-      </div>
-      <label for="inputRaceTime" class="col-form-label">Время на гонку (если используется TVP - 0)</label>
+      <label for="inputPrepareTime" class="col-form-label" title="Пауза между вылетами">Время на подготовку</label>
     </div>
     <div class="form-group row">
       <div class="col-2" style="min-width: 7em;">
@@ -50,6 +44,75 @@
       </div>
       <label for="inputLoops" class="col-form-label">Количество повторов (если время на гонку не 0)</label>
     </div>
+
+    <div class="dropdown">
+      <button class="btn btn-secondary dropdown-toggle" type="button" id="dropdownMenu1" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" style="margin-bottom: 20px;">
+        Настройки TVP
+      </button>
+      <div class="dropdown-menu p-4">
+        <div class="form-group">
+          <div class="form-check">
+            <input type="checkbox" class="form-check-input" id="checkbox-without-tvp">
+            <label class="form-check-label" for="checkbox-without-tvp">
+              Не использовать TinyViewPlus
+            </label>
+          </div>
+        </div>
+        <div class="form-group row">
+          <div class="col-2" style="min-width: 7em;">
+            <input type="number" class="form-control" id="inputRaceTime">
+          </div>
+          <label for="inputRaceTime" class="col-form-label">Время гонки (тренеровка, multiGP)</label>
+        </div>
+        <div class="form-group row">
+          <div class="col-2" style="min-width: 7em;">
+            <input type="number" class="form-control" id="inputRaceLaps">
+          </div>
+          <label for="inputRaceLaps" class="col-form-label">Сколько нужно пройти кругов</label>
+        </div>
+      </div>
+    </div>
+
+
+    <div class="dropdown">
+      <button class="btn btn-secondary dropdown-toggle" type="button" id="dropdownMenu2" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" style="margin-bottom: 20px;">
+        Настройки OBS
+      </button>
+      <div class="dropdown-menu p-4">
+        <div class="form-group">
+          <div class="form-check">
+            <input type="checkbox" class="form-check-input" id="checkbox-obsUse">
+            <label class="form-check-label" for="checkbox-obsUse">
+              Использовать OBS
+            </label>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="obsPort">Порт</label>
+          <input type="number" class="form-control" id="obsPort">
+        </div>
+        <div class="form-group">
+          <label for="obsPassword">Пароль</label>
+          <input type="password" class="form-control" id="obsPassword">
+        </div>
+        <div class="form-group">
+          <label for="obsSceneTVP">Сцена TVP</label>
+          <input type="text" class="form-control" id="obsSceneTVP">
+        </div>
+        <div class="form-group">
+          <label for="obsSceneWR">Сцена Whoop Race</label>
+          <input type="text" class="form-control" id="obsSceneWR">
+        </div>
+        <div class="form-group">
+          <label for="obsSceneBreak">Сцена перерыва</label>
+          <input type="text" class="form-control" id="obsSceneBreak">
+        </div>
+        <a href="#" id="obsCheckConnection">Проверить подключение OBS</a><br>
+        <a href="#" id="obsCreatScenes">Создать все сцены в OBS</a><br>
+      </div>
+    </div>
+
+    <button id="save-settings" type="button" class="btn btn-primary">Сохранить</button>
     <button id="submit-race" type="button" class="btn btn-primary">Создать гонку</button>
     <div id="help" style="padding-top: 3em;">
       <div id="showBestChannels">
@@ -175,5 +238,7 @@
 
 </body>
 <script>window.$ = window.jQuery = require('jquery');</script>
+<script src="./javascripts/bootstrap.bundle.min.js"></script>
+
 <script src="./javascripts/scripts.js"></script>
 </html>

@@ -14,6 +14,7 @@
     "electron-store": "^6.0.1",
     "jquery": "^3.5.1",
     "node-osc": "^5.2.1",
+    "obs-websocket-js": "^4.0.2",
     "xlsx": "^0.16.8"
   }
 }
