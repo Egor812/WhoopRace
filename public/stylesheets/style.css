@@ -20,6 +20,7 @@ a {
   background: navy;
   border-radius: 6px;
   margin:1em;
+  height: 120px
 }
 
 .pilots > .name {

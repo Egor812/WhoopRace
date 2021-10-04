@@ -25,6 +25,8 @@ function prerace(group=0, round = 0) {
         elmPilotsNext[i] = $('#pilot-next-'+(i+1));
     }
 
+    $('.group-pilots-results').hide();
+
     htmlGroup.innerHTML= `Группа ${(groupThis+1)}`;
     htmlRound.innerHTML= `Раунд ${(round+1)}/${raceLoops}`;
     for( let i=0; i<groups[groupThis].length; i++){
@@ -42,11 +44,7 @@ function prerace(group=0, round = 0) {
     //clockElm = document.getElementById('prepare-timer');
     //clockElm.innerText = settings.prepareTimer;
 
-    $('#race-timer').hide();
-    clockElm = $('#prepare-timer');
-    if( settings.prepareTimer===0 ) clockElm.text('');
-    else clockElm.text(settings.prepareTimer);
-    clockElm.show();
+    switchToPreraceTimer();
 
     let pagination='<ul class="pagination">';
     let sel;
@@ -77,12 +75,44 @@ function prerace(group=0, round = 0) {
 
 }
 
-function race() {
+function switchToRaceTimer() {
     $('#prepare-timer').hide();
     clockElm = $('#race-timer');
     clockElm.text(settings.raceTimer);
     clockElm.show();
-    if( settings.withoutTVP ) document.getElementById('wav-counter').play();
+}
+
+function switchToPreraceTimer() {
+    $('#race-timer').hide();
+    clockElm = $('#prepare-timer');
+    if( settings.prepareTimer===0 ) clockElm.text('');
+    else clockElm.text(settings.prepareTimer);
+    clockElm.show();
+}
+
+function race() {
+    switchToRaceTimer();
+    if( settings.withoutTVP ) {
+        $('.group-pilots-results').show();
+        document.getElementById('wav-counter').play();
+    }
+}
+
+function results(data, rules) {
+    switchToPreraceTimer();
+    console.log( 'rules:'+rules);
+    for( let i=0; i<4; i++){
+        if( !rules.savePlace )  $('#gpp-' + (i+1)).hide();
+        if( !rules.saveLaps )  $('#gpl-' + (i+1)).hide();
+        if( !rules.saveTime )  $('#gpt-' + (i+1)).hide();
+        if( typeof data[i] !== 'undefined' ) {
+            $('#gpp-' + (i+1)).val(data[i].pos);
+            $('#gpl-' + (i+1)).val(data[i].lps);
+            $('#gpt-' + (i+1)).val(Number((data[i].total).toFixed(2)));
+        }
+    }
+    $('.group-pilots-results').css( "display", "block" );
+    console.log(data);
 }
 
 function showPilotsAll(pilotsG) {
@@ -163,12 +193,25 @@ function getSettingsFromForm(){
     return args;
 }
 
+function getResultsFromForm() {
+    let results=[];
+    for( let i=1; i<=4; i++){
+        results[i-1] = {
+            laps : Number( $('#gpl-'+i).val()),
+            place : Number( $('#gpp-'+i).val() ),
+            time : Number( $('#gpt-'+i).val() )
+        };
+        /*results[i-1].laps = Number( $('#gpl-'+i).val() );
+        results[i-1].place = Number( $('#gpp-'+i).val() );
+        results[i-1].time = Number( $('#gpt-'+i).val() );*/
+    }
+    return results;
+}
+
 // IPC
 
 const { ipcRenderer } = require('electron');
-const remote = require('electron').remote;
-
-const settings = remote.getGlobal( "settings" );
+const settings = require('electron').remote.getGlobal( "settings" );
 
 ipcRenderer.on('timer-value', (event, arg)=> {
     clockElm.text(arg);
@@ -177,6 +220,11 @@ ipcRenderer.on('timer-value', (event, arg)=> {
 ipcRenderer.on('finish', ()=> {
     if( settings.withoutTVP ) document.getElementById('wav-finish').play();
 });
+
+ipcRenderer.on('editresults', (event, arg)=> {
+    results(arg['stat'], arg['rules']);
+});
+
 
 ipcRenderer.on('show-race', ()=> {
     race();
@@ -192,6 +240,10 @@ ipcRenderer.on('open-dialog-paths-selected', (event, arg)=> {
     ipcRenderer.invoke('parse-xls', arg).then( result => {
         showPilotsAll(result);
     });
+});
+
+ipcRenderer.on('query-results', (event, arg)=> {
+    ipcRenderer.send('get-results',{ results : getResultsFromForm() });
 });
 
 
@@ -216,7 +268,13 @@ window.setup = window.setup || {},
 
             obsCreatScenes: function()
             {
-                ipcRenderer.invoke('obsCreateScenes', {port: Number($('#obsPort').val()), pass:$('#obsPassword').val(), TVP: $('#obsSceneTVP').val(), WR: $('#obsSceneWR').val(), Break: $('#obsSceneBreak').val()})
+                ipcRenderer.invoke('obsCreateScenes', {
+                    port: Number($('#obsPort').val()),
+                    pass: $('#obsPassword').val(),
+                    TVP: $('#obsSceneTVP').val(),
+                     WR: $('#obsSceneWR').val(),
+                    Break: $('#obsSceneBreak').val()
+                }).then()
             },
 
             obsCheckConnection: function()
@@ -238,12 +296,12 @@ window.setup = window.setup || {},
                 //ipcRenderer.sendSync('submit-race',args);
 
                 ipcRenderer.invoke('submit-race', args).then( result => {
-                    if( result ) {
+                    if( result===1 ) {
                         $('#menu').hide();
                         ipcRenderer.send('start-prerace', {group: 0});
                         $('#race').show();
                     }
-                    else alert('Загрузите пилотов')
+                    else alert(result);
                 });
 
             },
@@ -264,6 +322,9 @@ window.setup = window.setup || {},
 
             addPreRaceTime: function() {
                 ipcRenderer.send('add-prerace-time');
+            },
+            pausePreRace: function() {
+                ipcRenderer.send('pause-prerace');
             },
 
 
@@ -296,13 +357,15 @@ window.setup = window.setup || {},
                 $('#pagination').on('click', '.page-item', function () {
                     setup.handler.changePage(this);
                 });
-                $('#prerace-pause').click( function () {
-                    setup.handler.changePage(this);
-                });
                 addEventListener("keyup", function(event) {
-                    if (event.code === 'Space') {
+                    if (event.code === 'KeyQ') {
                         if ($('#prepare-timer').is(":visible")) {
                             setup.handler.addPreRaceTime();
+                        }
+                    }
+                    else if (event.code === 'Space') {
+                        if ($('#prepare-timer').is(":visible")) {
+                            setup.handler.pausePreRace();
                         }
                     }
                 });

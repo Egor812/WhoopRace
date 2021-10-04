@@ -9,6 +9,7 @@ let timeInterval; // таймер race и prerace
 let raceLoop=0; // номер прохода через все группы;
 let inRace = 0; // сейчас запущена гонка
 let inCompetition = 0; // создана и запущена серия гонок
+let pause = 0;
 
 const electron = require('electron');
 const main = electron.app;  // Модуль контролирующей жизненный цикл нашего приложения.
@@ -66,6 +67,52 @@ const schema = {
         default: 1
     }
 };
+
+
+
+const rules =[
+    {},
+    {
+        id: 1,
+        name: 'traning',
+        saveLaps: 0,
+        saveTime: 0,
+        savePlace: 0,
+        minPilots: 1,
+        maxPilots: 100
+    },
+    {
+        id: 2,
+        name: 'qualification',
+        saveLaps: 1,
+        saveTime: 1,
+        savePlace: 0,
+        minPilots: 1,
+        maxPilots: 100
+    },
+    {},
+    {
+        //https://www.multigp.com/wp-content/uploads/2019/04/multigp-double-elim-brackets1.png
+        id: 4,
+        name: 'de8',
+        saveLaps: 0,
+        saveTime: 1,
+        savePlace: 1,
+        minPilots: 6,
+        maxPilots: 8
+    },
+    {
+        id: 5,
+        name: 'battle4',
+        saveLaps: 0,
+        saveTime: 1,
+        savePlace: 1,
+        minPilots: 1,
+        maxPilots: 4,
+    },
+
+];
+
 const store = new Store({schema});
 loadSettings();
 
@@ -101,7 +148,7 @@ oscServer.on('message', function (msg) {
             }
         }
         console.log(stat);
-        finishRace();
+        finishRace(stat);
         console.log('Finish message accepted');
     }
     //oscServer.close();
@@ -150,7 +197,7 @@ main.on('ready', function() {
     });
 
     // и загружаем файл index.html нашего веб приложения.
-    mainWindow.loadFile('./public/index.html');
+    mainWindow.loadFile('./public/index.html').then();
 
     // Открываем DevTools.
     if (isDev) {
@@ -241,10 +288,10 @@ ipcMain.handle( 'obsCreateScenes', async (event, arg)=> {
         address: 'localhost:' + arg['port'],
         password: arg['pass']
     })
-    .then( obs.send('CreateScene', {'sceneName': arg['TVP']}))
-    .then( obs.send('CreateScene', {'sceneName': arg['WR']}))
-    .then( obs.send('CreateScene', {'sceneName': arg['Break']}))
-    .then( obs.disconnect());
+    .then( () => obs.send('CreateScene', {'sceneName': arg['TVP']}) )
+    .then( () => obs.send('CreateScene', {'sceneName': arg['WR']}) )
+    .then( () => obs.send('CreateScene', {'sceneName': arg['Break']}) )
+    .then( () => obs.disconnect() );
 });
 
 /*
@@ -284,10 +331,22 @@ ipcMain.handle( 'parse-xls', async (event, arg)=> {
 Событие - запуск гонок
  */
 ipcMain.handle( 'submit-race', async (event, arg)=> {
-    if( !setSettings(arg) ) return 0;
+    setSettings(arg);
+    if( global.settings.groups.length===0) return 'Загрузите пилотов';
+
+    if( global.settings.pilots.length<rules[global.settings.rules].minPilots ||
+        global.settings.pilots.length>rules[global.settings.rules].maxPilots )
+        return 'Количество пилотов не соответствует выбранным правилам';
+
     saveSettings(arg);
+
     raceLoop=0;
+
+    store.set('groupCur', groupNext);
+    store.set('raceLoop', raceLoop);
+
     inCompetition=1;
+    pause=0;
     if( !arg['withoutTVP']){
         sendRaceDuration(global.settings.raceTimer);
         sendRaceLaps(global.settings.raceLaps);
@@ -303,7 +362,7 @@ ipcMain.handle( 'submit-race', async (event, arg)=> {
 Событие - Сохранить настройки с формы
  */
 ipcMain.handle( 'save-settings', async (event, arg)=> {
-    if( !setSettings(arg) ) return 0;
+    setSettings(arg);
     saveSettings(arg);
     return 1;
 });
@@ -330,16 +389,50 @@ ipcMain.on( 'add-prerace-time',  ()=> {
     return 1
 });
 
+ipcMain.on( 'pause-prerace',  ()=> {
+    if( !inRace ) pausePrerace();
+    return 1
+});
+
+// Получаем результаты гонки и сохраняем
+
+ipcMain.on( 'get-results',  ( event, arg )=> {
+    console.log(arg);
+    console.log(global.settings.pilots);
+    for( let i=0; i<4; i++ ){
+        if( typeof global.settings.pilots[groupCur * 4 + i].Results === 'undefined' ){
+            global.settings.pilots[groupCur * 4 + i].Results = [];
+        }
+        global.settings.pilots[ groupCur*4+i ].Results[raceLoop]= arg['results'][i];
+    }
+    console.log(global.settings.pilots);
+
+    store.set('pilots', global.settings.pilots);
+
+    let fs = require('fs');
+    fs.writeFile( './results/'+filenameDate()+'.txt', JSON.stringify(arg['results']), function (err) {
+        if (err) return console.log(err);
+        console.log('Резултаты записаны в файл');
+    });
+    nextRace(); // хотел передать имя этой функции сюда как текстовый аргумент, но не получилось вызвать функцию
+});
+
+
 // TODO сделать так? : единственный таймер всегда считает секунды. Меняются только отсчитываемые интервалы. Избавлюсь от рекурсии.
 function initializeClock(id, counter, endFunc = function(){return 0}) {
 
     function updateClock() {
-        timerCur--;
-        mainWindow.webContents.send('timer-value', timerCur);
-        if (timerCur <= 0) {
-            clearInterval(timeInterval);
-            endFunc();
-            //timerCur = 0;
+        if( !pause ) {
+            timerCur--;
+            mainWindow.webContents.send('timer-value', timerCur);
+            if (timerCur <= 0) {
+                clearInterval(timeInterval);
+                endFunc();
+                //timerCur = 0;
+            }
+        }
+        else {
+            mainWindow.webContents.send('timer-value', 'II');
         }
         //console.log(timerCur);
     }
@@ -379,28 +472,63 @@ function startRace() {
     return groupNext;
 }*/
 
-function finishRace() {
+function finishRace(stat = null) {
     inRace = 0;
     console.log('Finish G'+(groupCur+1)+'/'+global.settings.groups.length+' L'+(raceLoop+1)+'/'+global.settings.raceLoops);
     mainWindow.webContents.send('finish');
+
+
+    // результаты
+    //console.log(rules[global.settings.rules].savePlace+rules[global.settings.rules].saveTime+rules[global.settings.rules].saveLaps);
+    if( rules[global.settings.rules].savePlace+rules[global.settings.rules].saveTime+rules[global.settings.rules].saveLaps!==0 ){
+        mainWindow.webContents.send('editresults', { stat : stat, rules : rules[global.settings.rules] });
+        if( global.settings.obsUse ) changeSceneObs( global.settings.obsSceneWR);
+        if( global.settings.withoutTVP ) {
+            pausePrerace();
+            initializeClock('prepare-timer', 3, saveRace);
+        } // автопауза для заполнения таблицы результатов
+        else initializeClock('prepare-timer', 5, saveRace); // пауза для проверки результатов
+    }
+    else nextRace();
+    console.log( 'finishRace is completed');
+}
+
+
+function saveRace() {
+    if( rules[global.settings.rules].savePlace+rules[global.settings.rules].saveTime+rules[global.settings.rules].saveLaps!==0 ) {
+        mainWindow.webContents.send('query-results', 'nextRace');
+    }
+
+}
+
+function nextRace() {
+    // переключить группу
     let groupNext = groupCur+1;
     if( groupNext>=global.settings.groups.length) {
         groupNext=0;
         raceLoop++;
         if( global.settings.raceLoops ) {
-            if(raceLoop>=global.settings.raceLoops) return;
+            if(raceLoop>=global.settings.raceLoops) {
+                store.set('groupCur', groupNext);
+                store.set('raceLoop', raceLoop);
+                return;
+            }
         }
     }
+
+
     //const nextGroup = nextGroup(groupCur, global.settings.groups.length);
     /*todo if( global.settings.multiGp ) showResultsPre(); */
 
     startPrerace( groupNext );
     mainWindow.webContents.send('show-prerace', { group : groupNext, round : raceLoop });
-    console.log( 'finishRace is completed');
+    console.log( 'nextRace is completed');
 }
 
-
 function startPrerace(group){
+    store.set('groupCur', group);
+    store.set('raceLoop', raceLoop);
+
     if( global.settings.obsUse ) {
         changeSceneObs( global.settings.obsSceneWR);
     }
@@ -428,6 +556,20 @@ function addPreraceTime() {
     timerCur+=60;
     console.log( 'Добавленно 60 секунд на подготовку');
 }
+
+function pausePrerace() {
+    if(pause) {
+        pause = 0;
+        mainWindow.webContents.send('timer-value', timerCur);
+        console.log( 'Продолжаем' );
+    }
+    else {
+        pause=1;
+        mainWindow.webContents.send('timer-value', 'II');
+        console.log( 'Пауза' );
+    }
+}
+
 
 // перевести пилотов полученных из XLS / настроек в массив [группа] = [пилот1], [пилот2], ...
 // XLS
@@ -509,6 +651,9 @@ function isNumber(value) {
     return typeof value === 'number' && isFinite(value);
 }
 
+/*
+OBS - подключиться
+ */
 function connectObs(port, pass) {
     obs.connect({
         address: 'localhost:'+port,
@@ -552,7 +697,6 @@ function changeSceneObs(name) {
     }).then(r => console.log('OBS SetCurrentScene:', r));
 }
 
-
 /*
 Загрузка настроек из хранилища
  */
@@ -591,7 +735,6 @@ function setSettings(arg) {
     global.settings.obsSceneTVP=arg['obsSceneTVP'];
     global.settings.obsSceneWR=arg['obsSceneWR'];
     global.settings.obsSceneBreak=arg['obsSceneBreak'];
-    if( global.settings.groups.length===0) return 0;
     return 1;
 }
 
@@ -612,4 +755,25 @@ function saveSettings(arg) {
     store.set('obsSceneTVP', arg['obsSceneTVP']);
     store.set('obsSceneWR', arg['obsSceneWR']);
     store.set('obsSceneBreak', arg['obsSceneBreak']);
+}
+
+function filenameDate() {
+    let date = new Date();
+    let dd = date.getDate();
+    if (dd < 10) dd = '0' + dd;
+
+    let mm = date.getMonth() + 1;
+    if (mm < 10) mm = '0' + mm;
+
+    let yy = date.getFullYear() % 100;
+    if (yy < 10) yy = '0' + yy;
+
+    let hh = date.getHours();
+    if (hh < 10) dd = '0' + hh;
+    let min = date.getMinutes();
+    if (min < 10) min = '0' + min;
+    let ss = date.getSeconds();
+    if (ss < 10) ss = '0' + ss;
+
+    return yy + '-' + mm + '-' + dd + '--' + hh + '-' + min + '-' + ss;
 }

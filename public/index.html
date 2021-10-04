@@ -60,7 +60,7 @@
       Для 8 человек. 8 вылетов. Каждый пилот должен пройти заданное количество кругов на время. Можно ограничить время вылета.
     </div>
     <div class="rulesInfo" id="rulesInfo-5" style="display: none;">
-      Для 1-4 человек. 8 вылетов. Повторяются по кругу заданное число раз. Каждый пилот должен пройти заданное количество кругов на время. Можно ограничить время вылета.
+      Для 1-4 человек. Повторяются по кругу заданное число раз. Каждый пилот должен пройти заданное количество кругов на время. Можно ограничить время вылета.
     </div>
     <br>
     <div class="form-group form-check">
@@ -150,6 +150,10 @@
 
     <button id="save-settings" type="button" class="btn btn-primary">Сохранить</button>
     <button id="submit-race" type="button" class="btn btn-primary">Создать гонку</button>
+
+    <button id="resume-race" type="button" class="btn btn-primary">Продолжить гонку</button>
+    <button id="race-stat" type="button" class="btn btn-primary">Текущие результаты</button>
+
     <div id="help" style="padding-top: 3em;">
       <div id="showBestChannels">
         <a href="#" onclick="$('#showBestChannels > div.row').toggle()">Наилучшие сочетания каналов</a>
@@ -233,22 +237,42 @@
   <div id="group-pilots" class="row">
       <div id="pilot-1" class="pilots col">
         <span class='name'></span>
+        <span class='group-pilots-results' style="display: none">
+          <input type="number" class="form-control group-pilots-laps" id="gpl-1" title="круги" style="width: 50px; display:inline;" value="0">
+          <input type="number" class="form-control group-pilots-place" id="gpp-1" title="место" style="width: 50px; display:inline;" value="0">
+          <input type="text" class="form-control group-pilots-time" id="gpt-1" title="время" style="width: 100px; display:inline;" value="0">
+        </span>
         <span class="ch top badge badge-pill badge-warning"></span>
         <span class="judge bottom"></span>
       </div>
       <div id="pilot-2" class="pilots col">
         <span class='name'></span>
+        <span class='group-pilots-results' style="display: none">
+          <input type="number" class="form-control group-pilots-laps" id="gpl-2" style="width: 50px; display:inline;">
+          <input type="number" class="form-control group-pilots-place" id="gpp-2" style="width: 50px; display:inline;">
+          <input type="text" class="form-control group-pilots-time" id="gpt-2" style="width: 100px; display:inline;">
+        </span>
         <span class="ch top badge badge-pill badge-warning"></span>
         <span class="judge bottom"></span>
       </div>
       <div class="w-100"></div>
       <div id="pilot-3" class="pilots col">
         <span class='name'></span>
+        <span class='group-pilots-results' style="display: none">
+          <input type="number" class="form-control group-pilots-laps" id="gpl-3" style="width: 50px; display:inline;">
+          <input type="number" class="form-control group-pilots-place" id="gpp-3" style="width: 50px; display:inline;">
+          <input type="text" class="form-control group-pilots-time" id="gpt-3" style="width: 100px; display:inline;">
+        </span>
         <span class="ch top badge badge-pill badge-warning"></span>
         <span class="judge bottom"></span>
       </div>
       <div id="pilot-4" class="pilots col">
         <span class='name'></span>
+        <span class='group-pilots-results' style="display: none">
+          <input type="number" class="form-control group-pilots-laps" id="gpl-4" style="width: 50px; display:inline;">
+          <input type="number" class="form-control group-pilots-place" id="gpp-4" style="width: 50px; display:inline;">
+          <input type="text" class="form-control group-pilots-time" id="gpt-4" style="width: 100px; display:inline;">
+        </span>
         <span class="ch top badge badge-pill badge-warning"></span>
         <span class="judge bottom"></span>
       </div>
