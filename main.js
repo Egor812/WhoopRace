@@ -1,3 +1,5 @@
+'use strict';
+
 const isDev = process.env.APP_DEV ? (process.env.APP_DEV.trim() === "true") : false;
 
 global.settings = {};
@@ -6,6 +8,7 @@ let groupCur; // текущая группа пилотов
 let timeInterval; // таймер race и prerace
 let raceLoop=0; // номер прохода через все группы;
 let inRace = 0; // сейчас запущена гонка
+let inCompetition = 0; // создана и запущена серия гонок
 
 const electron = require('electron');
 const main = electron.app;  // Модуль контролирующей жизненный цикл нашего приложения.
@@ -56,10 +59,10 @@ const schema = {
         minimum: 0,
         default: 0
     },
-    multiGp: {
+    rules: {
         type: 'number',
-        maximum: 1,
-        minimum: 0,
+        maximum: 10,
+        minimum: 1,
         default: 1
     }
 };
@@ -67,17 +70,37 @@ const store = new Store({schema});
 loadSettings();
 
 // Общение с TVP
-const osc = require('node-osc');
-const client = new osc.Client('127.0.0.1', 4000);
-
-const oscServer = new osc.Server(4001, '127.0.0.1', () => {
+//https://github.com/MylesBorins/node-osc
+//const { Client, Server } = require('node-osc');
+// Нам нужна 6 версия. В пятой криво принималась кирилица.
+// Еще она использует osc-min, который использует new Buffer. И это приводит к  DeprecationWarning: Buffer() is deprecated due to security and usability issues. Please use the Buffer.alloc(), Buffer.allocUnsafe(), or Buffer.from() methods instead.
+const { Client, Server } = require('node-osc/dist/lib/index.js'); // В package.json 6 версии node-osc не указан "main": "./dist/lib/index.js", - приходится так
+const client = new Client('127.0.0.1', 4000);
+const oscServer = new Server(4001, '127.0.0.1', () => {
     console.log('OSC Server is listening');
 });
 
 oscServer.on('message', function (msg) {
     console.log(`OSC RX: ${msg}` );
-    msg.forEach(el => console.table(el));
-    if( inRace===1 && !global.settings.withoutTVP && String(msg) == '/racefinished' ) {
+
+    if( inCompetition===1 && inRace===1 && !global.settings.withoutTVP && String(msg[0]) === '/racefinished' ) {
+            //m.addStringArg( stat[i].pilot );
+            //m.addIntArg( stat[i].pos );
+            //m.addIntArg( stat[i].lps );
+            //m.addFloatArg( stat[i].total );
+        let stat = [];
+        if( msg.length >1 ){
+            let a=0;
+            for (let i = 1; i < msg.length; i+=4) {
+                stat[a] = {};
+                stat[a].pilot = msg[i];
+                stat[a].pos = msg[i+1];
+                stat[a].lps = msg[i+2];
+                stat[a].total = msg[i+3];
+                a++;
+            }
+        }
+        console.log(stat);
         finishRace();
         console.log('Finish message accepted');
     }
@@ -91,7 +114,13 @@ const obs = new OBSWebSocket();
 
 // You must add this handler to avoid uncaught exceptions.
 obs.on('error', err => {
-    console.error('socket error:', err);
+    console.error('OBS socket error:', err);
+});
+
+
+process.on('unhandledRejection', (reason, p) => {
+    console.log('Unhandled Rejection at: Promise', p, 'reason:', reason.stack);
+    // application specific logging, throwing an error, or other logic here
 });
 
 // Определение глобальной ссылки , если мы не определим, окно
@@ -143,7 +172,7 @@ const { ipcMain, dialog } = require('electron');
 /*
 Событие - открытие файла с пилотами
  */
-ipcMain.on('show-open-dialog', (event, arg)=> {
+ipcMain.on('show-open-dialog', (event)=> {
 
     const options = {
         title: 'Open XLS',
@@ -166,7 +195,7 @@ ipcMain.on('show-open-dialog', (event, arg)=> {
 /*
 Событие - Получить шаблон таблицы для регистрации участников
  */
-ipcMain.on( 'get-xls-tpl', (event, arg)=> {
+ipcMain.on( 'get-xls-tpl', ()=> {
     console.log('start');
     const XLSX = require('xlsx'); // https://github.com/SheetJS/sheetjs
     let wb = XLSX.utils.book_new();
@@ -233,7 +262,7 @@ ipcMain.handle( 'obsCheckConnection', async (event, arg)=> {
         console.error(error);
         return 0;
     });
-    client.send( '/v1/camera/1/label','param');
+    //client.send( '/v1/camera/1/label','param');
     console.log( 'OBS connection: '+res);
     return res;
 });
@@ -258,6 +287,7 @@ ipcMain.handle( 'submit-race', async (event, arg)=> {
     if( !setSettings(arg) ) return 0;
     saveSettings(arg);
     raceLoop=0;
+    inCompetition=1;
     if( !arg['withoutTVP']){
         sendRaceDuration(global.settings.raceTimer);
         sendRaceLaps(global.settings.raceLaps);
@@ -265,7 +295,6 @@ ipcMain.handle( 'submit-race', async (event, arg)=> {
     if( arg['obsUse'] ){
         connectObs(arg['obsPort'], arg['obsPassword']);
     }
-
     return 1;
 });
 
@@ -287,14 +316,19 @@ ipcMain.on( 'start-prerace', (event, arg)=> {
     if( group<0 ) group = global.settings.groups.length-1;
     if( group > global.settings.groups.length) group=0;
     startPrerace(group);
-    mainWindow.webContents.send('show-prerace', { group : group });
+    mainWindow.webContents.send('show-prerace', { group : group, round : raceLoop });
 });
 
-ipcMain.handle( 'stop-race', async (event, arg)=> {
+ipcMain.handle( 'stop-race', async ()=> {
+    inCompetition=0;
     clearInterval(timeInterval);
     return 1
 });
 
+ipcMain.on( 'add-prerace-time',  ()=> {
+    if( !inRace ) addPreraceTime();
+    return 1
+});
 
 // TODO сделать так? : единственный таймер всегда считает секунды. Меняются только отсчитываемые интервалы. Избавлюсь от рекурсии.
 function initializeClock(id, counter, endFunc = function(){return 0}) {
@@ -329,14 +363,14 @@ function startRace() {
     inRace = 1; // после команды на старт!
     if ( global.settings.raceTimer !==0) {
         if (global.settings.withoutTVP) {
-            delay(5000, 1).then(res => {
+            delay(5000, 1).then(() => {
                 initializeClock('race-timer', global.settings.raceTimer, finishRace)
             });
         } else {
             // ждем сообщение от TVP
         }
     }
-
+    console.log( 'startRace is completed');
 }
 
 /*function nextGroup(group, groupCount) {
@@ -361,7 +395,8 @@ function finishRace() {
     /*todo if( global.settings.multiGp ) showResultsPre(); */
 
     startPrerace( groupNext );
-    mainWindow.webContents.send('show-prerace', { group : groupNext });
+    mainWindow.webContents.send('show-prerace', { group : groupNext, round : raceLoop });
+    console.log( 'finishRace is completed');
 }
 
 
@@ -385,8 +420,14 @@ function startPrerace(group){
         if ( global.settings.raceTimer !==0) fn = startRace;
         initializeClock('prepare-timer', global.settings.prepareTimer, fn);
     }
+    console.log( 'startPrerace is completed');
 }
 
+
+function addPreraceTime() {
+    timerCur+=60;
+    console.log( 'Добавленно 60 секунд на подготовку');
+}
 
 // перевести пилотов полученных из XLS / настроек в массив [группа] = [пилот1], [пилот2], ...
 // XLS
@@ -456,7 +497,7 @@ const sendRaceLaps = function (num) {
  *
  * @param time
  * @param value
- * @return {Promise<any>}
+ * @return
  */
 function delay(time, value) {
     return new Promise(function(resolve) {
@@ -508,7 +549,7 @@ OBS - сменить сцену
 function changeSceneObs(name) {
     obs.send('SetCurrentScene', {
         'scene-name': name
-    });
+    }).then(r => console.log('OBS SetCurrentScene:', r));
 }
 
 
@@ -530,7 +571,7 @@ function loadSettings() {
     global.settings.obsSceneTVP = store.get('obsSceneTVP', 'tvp');
     global.settings.obsSceneWR = store.get('obsSceneWR', 'wr');
     global.settings.obsSceneBreak = store.get('obsSceneBreak', 'break');
-    global.settings.obsUse = store.get('multiGp', 1);
+    global.settings.rules = store.get('rules', 1);
 }
 
 /*
@@ -539,7 +580,7 @@ function loadSettings() {
 function setSettings(arg) {
     global.settings.judges=arg['judges'];
     global.settings.withoutTVP=arg['withoutTVP'];
-    global.settings.multiGp=arg['multiGp'];
+    global.settings.rules=arg['rules'];
     global.settings.prepareTimer=arg['prepareTimer'];
     global.settings.raceTimer=arg['raceTimer'];
     global.settings.raceLaps=arg['raceLaps'];
@@ -560,7 +601,7 @@ function setSettings(arg) {
 function saveSettings(arg) {
     store.set('judges', arg['judges']);
     store.set('withoutTVP', arg['withoutTVP']);
-    store.set('multiGp', arg['multiGp']);
+    store.set('rules', arg['rules']);
     store.set('raceTimer', arg['raceTimer']);
     store.set('raceLaps', arg['raceLaps']);
     store.set('prepareTimer', arg['prepareTimer']);

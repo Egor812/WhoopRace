@@ -3,17 +3,19 @@
 Пилоты загружаются из xls. 
 Имена пилотов выгружаются в Tiny View Plus автоматически
 
+Во время вызова пилотов можно увеличить время на подготовку на 60 секунд нажатием пробела
+
 # Требования
 Tiny View Plus от mcheli
 linux:
 
-{*Для TVP нужен opencv 3.2 : https://github.com/opencv/opencv/releases/tag/3.2.0
+<!---Для TVP нужен opencv 3.2 : https://github.com/opencv/opencv/releases/tag/3.2.0
 Качаем. Делаем Build core modules по инструкции https://docs.opencv.org/master/d7/d9f/tutorial_linux_install.html 
 с учетом, скаченного названия файла.
 TVP будет ругаться, что не видит libopencv_video.so.3.2
 Ищем sudo find / -name "libopencv_video.so.*"
 Делаем файл /etc/ld.so.conf.d/opencv.conf и записываем путь к файлу
-Исполняем sudo ldconfig -v
+Исполняем sudo ldconfig -v 
 
 И libpocofoundation62:
 https://packages.ubuntu.com/focal/amd64/gcc-10-base/download
@@ -41,7 +43,7 @@ https://packages.debian.org/buster/amd64/libboost-filesystem1.67-dev/download
 sudo add-apt-repository ppa:ubuntu-toolchain-r/test
 sudo apt-get update
 sudo apt-get install gcc-4.9
-sudo apt-get install --only-upgrade libstdc++6*}
+sudo apt-get install --only-upgrade libstdc++6 -->
 
 
 
@@ -64,7 +66,7 @@ https://github.com/Palakis/obs-websocket - WebSockets API for OBS Studio. 4.9.0 
 
 
 #### Особенности
--Каналы берем из xls, так как пилоты будут просить записать из на определенный канал
+-Каналы берем из xls, так как пилоты будут просить записать их на определенный канал
 -Порядковый номер в xls нужен для удобства заполнения файла
 
 
@@ -178,7 +180,7 @@ client.send('/v1/setduralaps', 10); // количество кругов
 client.send('/v1/startrace', ""); // запуск гонки
 
 
-#VМатериалы
+#Материалы
 https://github.com/MylesBorins/node-osc/blob/main/examples/esm.mjs
 https://www.electronjs.org/docs/api/ipc-main#ipcmain
 https://github.com/t-asano/ofxAruco
@@ -190,3 +192,26 @@ https://github.com/mchelifpv/tinyviewplus/blob/MCHeli/docs/OSCAPI_en.md
 https://github.com/obs-websocket-community-projects/obs-websocket-js/issues/223
 https://github.com/Palakis/obs-websocket/blob/4.x-current/docs/generated/protocol.md#createscene
 
+#Организация
+Если использовалась засечка и по результатам квалификаций у нескольких пилотов одинакое кол-во очков, 
+то можно ранжировать их по сумме времени всех раундов / на сумму кругов. Так минимально влияние ручного ввода 
+результатов при ошибке срабатывания засечки.  
+Лучшее время использовать не рекомендую, так как стабильность важнее.
+
+
+#Начало
+OBS+TVP
+-------
+Запустить TVP - проверить прием. Выйти, чтобы разгрузить систему
+Запустить OBS
+Подключить проектор
+Запустить WR
+WR Проверить связь с OBS
+OBS Вывести на пректор /*todo*/
+Запустить гонку. Проверить сменяемость сцен
+
+
+Ошибки засечки
+--------------
+В квалификации на круги.
+Добавлять круги. Не останавливать гонку пробелом.

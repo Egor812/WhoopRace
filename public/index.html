@@ -10,6 +10,17 @@
 <div class="audio">
   <audio id="wav-counter" src="./data/count.wav" preload="auto"></audio>
   <audio id="wav-finish" src="./data/finish.wav" preload="auto"></audio>
+  <audio id="wav-1" src="./data/1.wav" preload="auto"></audio>
+  <audio id="wav-2" src="./data/2.wav" preload="auto"></audio>
+  <audio id="wav-3" src="./data/3.wav" preload="auto"></audio>
+  <audio id="wav-4" src="./data/4.wav" preload="auto"></audio>
+  <audio id="wav-5" src="./data/5.wav" preload="auto"></audio>
+  <audio id="wav-6" src="./data/6.wav" preload="auto"></audio>
+  <audio id="wav-7" src="./data/7.wav" preload="auto"></audio>
+  <audio id="wav-8" src="./data/8.wav" preload="auto"></audio>
+  <audio id="wav-9" src="./data/9.wav" preload="auto"></audio>
+  <audio id="wav-10" src="./data/10.wav" preload="auto"></audio>
+  <audio id="wav-invite" src="./data/invite.wav" preload="auto"></audio>
 </div>
 
 <div id="menu">
@@ -24,13 +35,37 @@
   <div id="list-pilots" style="display:block;">  </div>
 
   <div id="settings">
+
+    <div class="input-group mb-3 row">
+      <label for="rulesSelector" class="col-sm-2 col-form-label">Правила</label>
+      <select class="form-select" id="rulesSelector">
+        <option value="1" data-loops="1" data-laps="0">Тренеровка</option>
+        <option value="2" data-loops="1" data-laps="0">Квалификации</option>
+        <!--<option value="3">Круговой турнир (5-6ч)</option>-->
+        <option value="4" data-loops="0" data-laps="1">Double Elimination (8ч)</option>
+        <!--<option value="6" data-loops="0" data-laps="1">Double Elimination (16ч 14р)</option>-->
+        <option value="5" data-loops="1" data-laps="1">Турнир (1-4ч)</option>
+      </select>
+    </div>
+    <div class="rulesInfo" id="rulesInfo-1" style="display: none;">
+      Вылететы заданной длительности без подсчета результатов. Повторяются по кругу заданное число раз.
+    </div>
+    <div class="rulesInfo" id="rulesInfo-2" style="display: none;">
+      Вылететы заданной длительности с подсчетом пройденного количества кругов. Повторяются по кругу заданное число раз. Можно ограничить время вылета.
+    </div>
+    <div class="rulesInfo" id="rulesInfo-3" style="display: none;">
+      Для 5 человек - 5 вылетов. Для 6 человек - 15 вылетов. Каждый будет летать с каждым. Каждый пилот должен пройти заданное количество кругов на время. Можно ограничить время вылета.
+    </div>
+    <div class="rulesInfo" id="rulesInfo-4" style="display: none;">
+      Для 8 человек. 8 вылетов. Каждый пилот должен пройти заданное количество кругов на время. Можно ограничить время вылета.
+    </div>
+    <div class="rulesInfo" id="rulesInfo-5" style="display: none;">
+      Для 1-4 человек. 8 вылетов. Повторяются по кругу заданное число раз. Каждый пилот должен пройти заданное количество кругов на время. Можно ограничить время вылета.
+    </div>
+    <br>
     <div class="form-group form-check">
       <input type="checkbox" class="form-check-input" id="checkbox-judge">
       <label class="form-check-label" for="checkbox-judge" title="каждому пилоту назначаетя судья из других пилотов">Судьи из зала</label>
-    </div>
-    <div class="form-group form-check">
-      <input type="checkbox" class="form-check-input" id="checkbox-multigp">
-      <label class="form-check-label" for="checkbox-multigp" title="Очки - количество пройденных за отведенное время кругов. После вылета будут выводиться промежуточные результаты.">MultyGP</label>
     </div>
     <div class="form-group row">
       <div class="col-2"  style="min-width: 7em;">
@@ -38,6 +73,19 @@
       </div>
       <label for="inputPrepareTime" class="col-form-label" title="Пауза между вылетами">Время на подготовку</label>
     </div>
+    <div class="form-group row">
+      <div class="col-2" style="min-width: 7em;">
+        <input type="number" class="form-control" id="inputRaceTime">
+      </div>
+      <label for="inputRaceTime" class="col-form-label">Время одной гонки</label>
+    </div>
+    <div class="form-group row">
+      <div class="col-2" style="min-width: 7em;">
+        <input type="number" class="form-control" id="inputRaceLaps">
+      </div>
+      <label for="inputRaceLaps" class="col-form-label">Сколько нужно пройти кругов</label>
+    </div>
+
     <div class="form-group row">
       <div class="col-2" style="min-width: 7em;">
         <input type="number" class="form-control" id="inputLoops">
@@ -57,18 +105,6 @@
               Не использовать TinyViewPlus
             </label>
           </div>
-        </div>
-        <div class="form-group row">
-          <div class="col-2" style="min-width: 7em;">
-            <input type="number" class="form-control" id="inputRaceTime">
-          </div>
-          <label for="inputRaceTime" class="col-form-label">Время гонки (тренеровка, multiGP)</label>
-        </div>
-        <div class="form-group row">
-          <div class="col-2" style="min-width: 7em;">
-            <input type="number" class="form-control" id="inputRaceLaps">
-          </div>
-          <label for="inputRaceLaps" class="col-form-label">Сколько нужно пройти кругов</label>
         </div>
       </div>
     </div>
@@ -192,8 +228,8 @@
 
 
 <div id="race" style="display: none">
-  <div id="group" class="badge badge-info" style="font-size: 1.5em;text-align: right;margin-bottom: 0;">
-  </div>
+  <div id="group" class="badge badge-info" style="font-size: 1.5em;text-align: right;margin-bottom: 0;"> </div>
+  <div id="round" class="badge badge-secondary" style="font-size: 1.5em;text-align: right;margin-bottom: 0;"> </div>
   <div id="group-pilots" class="row">
       <div id="pilot-1" class="pilots col">
         <span class='name'></span>

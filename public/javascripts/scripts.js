@@ -3,11 +3,12 @@ let clockElm;
 /*
 Страница приглашения пилотов
  */
-function prerace(group=0) {
+function prerace(group=0, round = 0) {
 
     let groups = settings.groups;
     //let prepareTimer = settings.prepareTimer;
     //let raceTimer = settings.raceTimer;
+    const raceLoops = settings.raceLoops;
     let groupThis = group;
     let groupMax = groups.length; // max index+1
     let groupNext;
@@ -17,14 +18,15 @@ function prerace(group=0) {
     const elmPilots = [];
     const elmPilotsNext=[];
     const htmlGroup = document.getElementById('group');
+    const htmlRound = document.getElementById('round');
     const elmPagination = $('#pagination');
     for( let i=0; i<4; i++) {
         elmPilots[i] = $('#pilot-'+(i+1)+' .name');
-
         elmPilotsNext[i] = $('#pilot-next-'+(i+1));
     }
 
     htmlGroup.innerHTML= `Группа ${(groupThis+1)}`;
+    htmlRound.innerHTML= `Раунд ${(round+1)}/${raceLoops}`;
     for( let i=0; i<groups[groupThis].length; i++){
         elmPilots[i].text(groups[groupThis][i]['Name']);
         $('#pilot-'+(i+1)+' > .ch').text(groups[groupThis][i]['Channel']);
@@ -65,6 +67,14 @@ function prerace(group=0) {
     pagination += '</ul>';
     elmPagination.html(pagination);
 
+
+
+    let audio = document.getElementById('wav-invite');
+    audio.addEventListener('ended', () => {
+        setTimeout(() => {  document.getElementById('wav-' + (groupThis + 1)).play(); }, 250);
+    }, { once: true });
+    audio.play();
+
 }
 
 function race() {
@@ -94,6 +104,19 @@ function showPilotsAll(pilotsG) {
     HTMLOUT.innerHTML = x;
 }
 
+
+function rulesChange()
+{
+    $( ".rulesInfo" ).each(function() {
+        $( this ).hide();
+    });
+    const elm = $( "#rulesSelector option:selected" );
+    let n = elm.val();
+    if( elm.data('loops')===0 ) $('#inputLoops').parent().parent().hide(); else $('#inputLoops').parent().parent().show();
+    if( elm.data('laps')===0 ) $('#inputRaceLaps').parent().parent().hide(); else $('#inputRaceLaps').parent().parent().show();
+    $( "#rulesInfo-"+n ).show();
+}
+
 /*
 Заполнение формы setup
  */
@@ -101,7 +124,7 @@ function setSettings(settings) {
     if( settings['judges'] ) $('#checkbox-judge').prop('checked', true);
     if( settings['withoutTVP'] ) $('#checkbox-without-tvp').prop('checked', true);
     if( settings['obsUse'] ) $('#checkbox-obsUse').prop('checked', true);
-
+    if( settings['rules'] ) $('#rulesSelector option[value='+settings['rules']+']').attr('selected','selected');
     $('#obsPort').val(settings.obsPort);
     $('#obsPassword').val(settings.obsPassword);
     $('#obsSceneTVP').val(settings.obsSceneTVP);
@@ -120,11 +143,11 @@ function setSettings(settings) {
 Получить данные формы настроек
  */
 function getSettingsFromForm(){
-    let judges, withoutTVP, multiGp, obsUse;
+    let judges, withoutTVP, obsUse;
     if( $('#checkbox-judge').is(':checked') ) judges=1; else judges=0;
-    if( $('#checkbox-multigp').is(':checked') ) multiGp=1; else multiGp=0;
     if( $('#checkbox-obsUse').is(':checked') ) obsUse=1; else obsUse=0;
     if( $('#checkbox-without-tvp').is(':checked') ) withoutTVP=1; else withoutTVP=0;
+    const rules = Number($("#rulesSelector option:selected").val());
     let prepareTimer = Number($('#inputPrepareTime').val());
     let raceTimer = Number($('#inputRaceTime').val());
     let raceLaps = Number($('#inputRaceLaps').val());
@@ -134,7 +157,7 @@ function getSettingsFromForm(){
     let obsSceneTVP = $('#obsSceneTVP').val();
     let obsSceneWR = $('#obsSceneWR').val();
     let obsSceneBreak = $('#obsSceneBreak').val();
-    const args = {judges: judges, withoutTVP: withoutTVP, prepareTimer: prepareTimer, raceTimer : raceTimer, raceLoops: raceLoops, multiGp: multiGp,
+    const args = {judges: judges, withoutTVP: withoutTVP, prepareTimer: prepareTimer, raceTimer : raceTimer, raceLoops: raceLoops, rules: rules,
         obsUse:obsUse, obsPort:obsPort, obsSceneTVP:obsSceneTVP, obsSceneWR:obsSceneWR, obsSceneBreak:obsSceneBreak, obsPassword:obsPassword, raceLaps:raceLaps};
     console.log(args);
     return args;
@@ -151,16 +174,16 @@ ipcRenderer.on('timer-value', (event, arg)=> {
     clockElm.text(arg);
 });
 
-ipcRenderer.on('finish', (event, arg)=> {
+ipcRenderer.on('finish', ()=> {
     if( settings.withoutTVP ) document.getElementById('wav-finish').play();
 });
 
-ipcRenderer.on('show-race', (event, arg)=> {
+ipcRenderer.on('show-race', ()=> {
     race();
 });
 
 ipcRenderer.on('show-prerace', (event, arg)=> {
-    prerace(arg['group']);
+    prerace(arg['group'], arg['round']);
 });
 
 ipcRenderer.on('open-dialog-paths-selected', (event, arg)=> {
@@ -204,7 +227,7 @@ window.setup = window.setup || {},
 
             saveSettings: function(){
               const args = getSettingsFromForm();
-                ipcRenderer.invoke('save-settings', args).then( result => {
+                ipcRenderer.invoke('save-settings', args).then( () => {
                     alert('Сохранено')
                 });
 
@@ -227,7 +250,7 @@ window.setup = window.setup || {},
 
             stopRace: function(){
                 $('#race').hide();
-                ipcRenderer.invoke('stop-race').then( result => {
+                ipcRenderer.invoke('stop-race').then( () => {
                     setSettings(settings);
                     $('#menu').show();
                 });
@@ -237,6 +260,10 @@ window.setup = window.setup || {},
                 //alert(elm.dataset.page);
                 ipcRenderer.send('start-prerace',{ group : Number(elm.dataset.page) });
                 $('#race').show();
+            },
+
+            addPreRaceTime: function() {
+                ipcRenderer.send('add-prerace-time');
             },
 
 
@@ -269,9 +296,25 @@ window.setup = window.setup || {},
                 $('#pagination').on('click', '.page-item', function () {
                     setup.handler.changePage(this);
                 });
+                $('#prerace-pause').click( function () {
+                    setup.handler.changePage(this);
+                });
+                addEventListener("keyup", function(event) {
+                    if (event.code === 'Space') {
+                        if ($('#prepare-timer').is(":visible")) {
+                            setup.handler.addPreRaceTime();
+                        }
+                    }
+                });
+                $( "#rulesSelector" ).change( function() {
+                    rulesChange();
+                });
+                //.trigger( "change" );
+
 
                 $(function() {  // on ready
                     setSettings(settings);
+                    rulesChange();
                 });
 
             }
