@@ -1,9 +1,21 @@
 let clockElm;
 
+
+function showMenu(settings, raceLoop, groupCur) {
+    setSettings(settings);
+    rulesChange();
+    document.getElementById('race-progress').innerHTML = `Начинается круг ${raceLoop+1} группа ${groupCur+1}`;
+    $('#menu').show();
+}
+
 /*
 Страница приглашения пилотов
  */
 function prerace(group=0, round = 0) {
+
+    $('#race').show();
+    $('#menu').hide();
+    $('#results').hide();
 
     let groups = settings.groups;
     //let prepareTimer = settings.prepareTimer;
@@ -115,6 +127,36 @@ function results(data, rules) {
     console.log(data);
 }
 
+function showResults(data, loop) {
+    console.log(data);
+    $('#race').hide();
+    $('#menu').hide();
+    $('#results').show();
+
+    document.getElementById('result-round').innerHTML= `Раунд ${(loop)}/${settings.raceLoops}`;
+
+    const HTMLOUT = document.getElementById('result-table');
+    let x='';
+    data.forEach( function(item) {
+        x += '<span class="setup-pilots-badge badge badge-warning" style="width:120px; margin-right:30px">' + item.Name + '</span>';
+        item.Results.forEach( function(res) {
+           x += '<span class="result-table-intermediate">';
+           if( res.laps!==false ) x += '<span class="result-cell" style="width: 20px;">'+res.laps+'</span>';
+           if( res.place!==false ) x += '<span class="result-cell" style="width: 20px;">'+res.place+'</span>';
+           if( res.time!==false ) x += '<span class="result-cell" style="width: 60px;">'+res.time+'</span>';
+           x += '</span>';
+        });
+        if( typeof item.Sums !== 'undefined' ) {
+            let style ='';
+            if( item.Sums.place<=3 ) style='style="color:red"';
+            x += `<span class="result-table-final" ${style}>` + item.Sums.place + '</span>';
+        }
+        x +='<br>';
+    });
+
+    HTMLOUT.innerHTML = x;
+}
+
 function showPilotsAll(pilotsG) {
     if( pilotsG === undefined ) return;
     const HTMLOUT = document.getElementById('list-pilots');
@@ -208,6 +250,7 @@ function getResultsFromForm() {
     return results;
 }
 
+
 // IPC
 
 const { ipcRenderer } = require('electron');
@@ -238,18 +281,23 @@ ipcRenderer.on('open-dialog-paths-selected', (event, arg)=> {
     setup.handler.outputSelectedPathsFromOpenDialog(arg);
     // запрос с промисом
     ipcRenderer.invoke('parse-xls', arg).then( result => {
-        showPilotsAll(result);
+        showMenu( settings, result.raceLoop, result.groupCur);
+        showPilotsAll(result.groups);
     });
 });
 
-ipcRenderer.on('query-results', (event, arg)=> {
+ipcRenderer.on('query-results', ()=> {
     ipcRenderer.send('get-results',{ results : getResultsFromForm() });
+});
+
+ipcRenderer.on('show-results', (event, arg)=> {
+    showResults(arg['results'], arg['round']);
 });
 
 
 // HANDLERS
 
-window.setup = window.setup || {},
+window.setup = window.setup || {}, // откуда я это взял? как это работает?
     function(n) {
 
         setup.handler = {
@@ -291,26 +339,40 @@ window.setup = window.setup || {},
 
             },
 
+            // Новая гонка
             submitRace: function(){
                 const args = getSettingsFromForm();
                 //ipcRenderer.sendSync('submit-race',args);
 
                 ipcRenderer.invoke('submit-race', args).then( result => {
                     if( result===1 ) {
-                        $('#menu').hide();
                         ipcRenderer.send('start-prerace', {group: 0});
-                        $('#race').show();
                     }
                     else alert(result);
                 });
-
             },
 
-            stopRace: function(){
+            // остановить гонку (Х)
+            exitRace: function(){
                 $('#race').hide();
-                ipcRenderer.invoke('stop-race').then( () => {
-                    setSettings(settings);
-                    $('#menu').show();
+                $('#results').hide();
+                ipcRenderer.invoke('stop-race').then( result => {
+                    showMenu( settings, result['raceLoop'], result['groupCur']);
+                });
+            },
+
+            // показать результаты
+            showStat: function(){
+                ipcRenderer.send('get-stat');
+            },
+
+            // продолжить гонку
+            resumeRace: function(){
+                ipcRenderer.invoke('resume-race').then( result => {
+                    if( result===1 ) {
+                        ipcRenderer.send('start-prerace', {group: false});
+                    }
+                    else alert(result);
                 });
             },
 
@@ -320,11 +382,19 @@ window.setup = window.setup || {},
                 $('#race').show();
             },
 
+            // увеличить время на подготовку
             addPreRaceTime: function() {
                 ipcRenderer.send('add-prerace-time');
             },
+
+            // пауза
             pausePreRace: function() {
                 ipcRenderer.send('pause-prerace');
+            },
+
+            // экспорт результатов в XLS
+            exportXLS: function() {
+                ipcRenderer.send('export-xls');
             },
 
 
@@ -338,21 +408,30 @@ window.setup = window.setup || {},
                 });
                 $('#obsCreatScenes').click( function () {
                     setup.handler.obsCreatScenes();
-                    }
-                );
+                });
                 $('#obsCheckConnection').click( function () {
-                        setup.handler.obsCheckConnection();
-                    }
-                );
+                    setup.handler.obsCheckConnection();
+                });
                 $('#save-settings').click( function () {
                     setup.handler.saveSettings();
                 });
-
                 $('#submit-race').click( function () {
                     setup.handler.submitRace();
                 });
                 $('#stop-race').click( function () {
-                    setup.handler.stopRace();
+                    setup.handler.exitRace();
+                });
+                $('#race-stat').click( function () {
+                    setup.handler.showStat();
+                });
+                $('#close-stat').click( function () {
+                    setup.handler.exitRace();
+                });
+                $('#resume-race').click( function () {
+                    setup.handler.resumeRace();
+                });
+                $('#export-xls').click( function () {
+                    setup.handler.exportXLS();
                 });
                 $('#pagination').on('click', '.page-item', function () {
                     setup.handler.changePage(this);
@@ -374,10 +453,10 @@ window.setup = window.setup || {},
                 });
                 //.trigger( "change" );
 
-
                 $(function() {  // on ready
-                    setSettings(settings);
-                    rulesChange();
+                    ipcRenderer.invoke('get-progress').then( result  => {
+                        showMenu( settings, result['raceLoop'], result['groupCur']);
+                    });
                 });
 
             }

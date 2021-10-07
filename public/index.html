@@ -148,11 +148,17 @@
       </div>
     </div>
 
-    <button id="save-settings" type="button" class="btn btn-primary">Сохранить</button>
-    <button id="submit-race" type="button" class="btn btn-primary">Создать гонку</button>
+    <div class="form-group">
+      <button id="save-settings" type="button" class="btn btn-primary">Сохранить</button>
+      <button id="submit-race" type="button" class="btn btn-primary">Создать гонку</button>
+    </div>
 
-    <button id="resume-race" type="button" class="btn btn-primary">Продолжить гонку</button>
-    <button id="race-stat" type="button" class="btn btn-primary">Текущие результаты</button>
+    <div class="form-group">
+      <button id="resume-race" type="button" class="btn btn-primary">Продолжить гонку</button>
+      <button id="race-stat" type="button" class="btn btn-primary">Текущие результаты</button>
+      <button id="export-xls" type="button" class="btn btn-primary">Экспорт в XLS</button>
+    </div>
+    <div id="race-progress">    </div>
 
     <div id="help" style="padding-top: 3em;">
       <div id="showBestChannels">
@@ -248,9 +254,9 @@
       <div id="pilot-2" class="pilots col">
         <span class='name'></span>
         <span class='group-pilots-results' style="display: none">
-          <input type="number" class="form-control group-pilots-laps" id="gpl-2" style="width: 50px; display:inline;">
-          <input type="number" class="form-control group-pilots-place" id="gpp-2" style="width: 50px; display:inline;">
-          <input type="text" class="form-control group-pilots-time" id="gpt-2" style="width: 100px; display:inline;">
+          <input type="number" class="form-control group-pilots-laps" id="gpl-2" title="круги" style="width: 50px; display:inline;">
+          <input type="number" class="form-control group-pilots-place" id="gpp-2" title="место" style="width: 50px; display:inline;">
+          <input type="text" class="form-control group-pilots-time" id="gpt-2" title="время" style="width: 100px; display:inline;">
         </span>
         <span class="ch top badge badge-pill badge-warning"></span>
         <span class="judge bottom"></span>
@@ -259,9 +265,9 @@
       <div id="pilot-3" class="pilots col">
         <span class='name'></span>
         <span class='group-pilots-results' style="display: none">
-          <input type="number" class="form-control group-pilots-laps" id="gpl-3" style="width: 50px; display:inline;">
-          <input type="number" class="form-control group-pilots-place" id="gpp-3" style="width: 50px; display:inline;">
-          <input type="text" class="form-control group-pilots-time" id="gpt-3" style="width: 100px; display:inline;">
+          <input type="number" class="form-control group-pilots-laps" id="gpl-3" title="круги" style="width: 50px; display:inline;">
+          <input type="number" class="form-control group-pilots-place" id="gpp-3" title="место" style="width: 50px; display:inline;">
+          <input type="text" class="form-control group-pilots-time" id="gpt-3" title="время" style="width: 100px; display:inline;">
         </span>
         <span class="ch top badge badge-pill badge-warning"></span>
         <span class="judge bottom"></span>
@@ -269,9 +275,9 @@
       <div id="pilot-4" class="pilots col">
         <span class='name'></span>
         <span class='group-pilots-results' style="display: none">
-          <input type="number" class="form-control group-pilots-laps" id="gpl-4" style="width: 50px; display:inline;">
-          <input type="number" class="form-control group-pilots-place" id="gpp-4" style="width: 50px; display:inline;">
-          <input type="text" class="form-control group-pilots-time" id="gpt-4" style="width: 100px; display:inline;">
+          <input type="number" class="form-control group-pilots-laps" id="gpl-4" title="круги" style="width: 50px; display:inline;">
+          <input type="number" class="form-control group-pilots-place" id="gpp-4" title="место" style="width: 50px; display:inline;">
+          <input type="text" class="form-control group-pilots-time" id="gpt-4" title="время" style="width: 100px; display:inline;">
         </span>
         <span class="ch top badge badge-pill badge-warning"></span>
         <span class="judge bottom"></span>
@@ -293,6 +299,13 @@
     <div id="pagination"></div>
   </div>
   <div id='stop-race' style="position:absolute; top:0; right:0; cursor:pointer">X</div>
+</div>
+
+<div id="results" style="display: none">
+  <div id="result-round" class="badge badge-secondary" style="font-size: 1.5em;text-align: right;margin-bottom: 0;"> </div>
+  <div id="result-table" style="margin-top: 30px"></div>
+  <div id='close-stat' style="position:absolute; top:0; right:0; cursor:pointer">X</div>
+
 </div>
 
 

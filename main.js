@@ -131,10 +131,11 @@ oscServer.on('message', function (msg) {
     console.log(`OSC RX: ${msg}` );
 
     if( inCompetition===1 && inRace===1 && !global.settings.withoutTVP && String(msg[0]) === '/racefinished' ) {
-            //m.addStringArg( stat[i].pilot );
-            //m.addIntArg( stat[i].pos );
-            //m.addIntArg( stat[i].lps );
-            //m.addFloatArg( stat[i].total );
+
+        //m.addStringArg( stat[i].pilot );
+        //m.addIntArg( stat[i].pos );
+        //m.addIntArg( stat[i].lps );
+        //m.addFloatArg( stat[i].total );
         let stat = [];
         if( msg.length >1 ){
             let a=0;
@@ -266,7 +267,15 @@ ipcMain.on( 'get-xls-tpl', ()=> {
               extensions: ['xls']}
         ]
     };
-     dialog.showSaveDialog(mainWindow, options).then(result => {
+    showSaveDialog( mainWindow, options, wb, XLSX);
+    console.log('end');
+
+
+});
+
+function showSaveDialog( mainWindow, options, wb, XLSX)
+{
+    dialog.showSaveDialog(mainWindow, options).then(result => {
         if( !result.canceled) {
             console.log(result);
             XLSX.writeFile(wb, result.filePath);
@@ -275,10 +284,8 @@ ipcMain.on( 'get-xls-tpl', ()=> {
     }).catch(err => {
         console.log(err)
     });
-    console.log('end');
 
-
-});
+}
 
 /*
 Событие - Создать необходимые каналы в OBS
@@ -321,10 +328,11 @@ ipcMain.handle( 'parse-xls', async (event, arg)=> {
     const first_sheet_name = wb.SheetNames[0];
     const ws = wb.Sheets[first_sheet_name];
     const pilotsObj =  XLSX.utils.sheet_to_json(ws);
-    store.set('pilots', pilotsObj);
-    const groups = preparePilots(pilotsObj);
+    let pilots = parseXLS(pilotsObj);
+    store.set('pilots', pilots);
+    const groups = preparePilots(pilots);
     global.settings.groups =  groups;
-    return groups;
+    return {groups:groups, raceLoop:raceLoop, groupCur:groupCur};
 });
 
 /*
@@ -341,8 +349,8 @@ ipcMain.handle( 'submit-race', async (event, arg)=> {
     saveSettings(arg);
 
     raceLoop=0;
-
-    store.set('groupCur', groupNext);
+    groupCur=0;
+    store.set('groupCur', groupCur);
     store.set('raceLoop', raceLoop);
 
     inCompetition=1;
@@ -358,6 +366,20 @@ ipcMain.handle( 'submit-race', async (event, arg)=> {
 });
 
 
+ipcMain.handle( 'resume-race', async ()=> {
+    if( global.settings.raceLoops && raceLoop>=global.settings.raceLoops) return 'Гонка завершена';
+    inCompetition=1;
+    pause=0;
+    if( !global.settings.withoutTVP ){
+        sendRaceDuration(global.settings.raceTimer);
+        sendRaceLaps(global.settings.raceLaps);
+    }
+    if( global.settings.obsUse ){
+        connectObs( global.settings.obsPort, global.settings.obsPassword);
+    }
+    return 1;
+});
+
 /*
 Событие - Сохранить настройки с формы
  */
@@ -372,16 +394,19 @@ ipcMain.handle( 'save-settings', async (event, arg)=> {
  */
 ipcMain.on( 'start-prerace', (event, arg)=> {
     let group = arg['group'];
-    if( group<0 ) group = global.settings.groups.length-1;
-    if( group > global.settings.groups.length) group=0;
-    startPrerace(group);
-    mainWindow.webContents.send('show-prerace', { group : group, round : raceLoop });
+    if( group !== false ) {
+        if (group < 0) group = global.settings.groups.length - 1;
+        if (group > global.settings.groups.length) group = 0;
+        groupCur = group;
+    }
+    store.set('groupCur', groupCur);
+    startPrerace();
 });
 
 ipcMain.handle( 'stop-race', async ()=> {
     inCompetition=0;
     clearInterval(timeInterval);
-    return 1
+    return { raceLoop, groupCur };
 });
 
 ipcMain.on( 'add-prerace-time',  ()=> {
@@ -394,8 +419,26 @@ ipcMain.on( 'pause-prerace',  ()=> {
     return 1
 });
 
-// Получаем результаты гонки и сохраняем
+/*
+Получить результаты для статистики вызванной из меню
+ */
+ipcMain.on( 'get-stat',  ()=> {
+    if( global.settings.raceLoops && raceLoop>=global.settings.raceLoops) {
+        //ИТОГОВЫЙ ИТОГ
+        showFinalResults();
+    }
+    else{
+        //промежуточный итог
+        showIntermediateResults();
+    }
+});
 
+
+ipcMain.handle( 'get-progress',  ()=> {
+    return { raceLoop, groupCur };
+});
+
+// Получаем результаты гонки с формы и сохраняем
 ipcMain.on( 'get-results',  ( event, arg )=> {
     console.log(arg);
     console.log(global.settings.pilots);
@@ -417,8 +460,86 @@ ipcMain.on( 'get-results',  ( event, arg )=> {
     nextRace(); // хотел передать имя этой функции сюда как текстовый аргумент, но не получилось вызвать функцию
 });
 
+function parseXLS(xlsjson)
+{
+    let loop =0;
+    let curLoop;
+    let result = [];
+    let fSetPos = 0;
+    xlsjson.forEach( function ( item, i ) {
+        let p=0;
+        let place, time, laps;
+        result[i] = {};
+        result[i].Results = [];
+        Object.keys(item).map(function(objectKey, index) {
+            let value = item[objectKey];
+            if (index<=3 ) result[i][objectKey] = value;
+            else {
+                p = (index-4) % 3;
+                switch(p) {
+                    case 0:
+                        place=value;
+                        break;
+                    case 1:
+                        time= value;
+                        break;
+                    case 2:
+                        laps= value;
+                        result[i].Results.push({ place: place, time:time, laps:laps})
+                }
+            }
+        });
+        curLoop = result[i].Results.length;
+        if( curLoop < loop) {
+            fSetPos = 1;
+            groupCur = result[i].Group-1;
+            raceLoop = curLoop;
+        }
+        else loop = curLoop;
+    });
+    if( !fSetPos ) {
+        raceLoop = loop;
+        groupCur = 0;
+    }
+    //console.log( JSON.parse(JSON.stringify(obj)) );
+    console.log(result, raceLoop, groupCur);
+    return result;
+}
 
-// TODO сделать так? : единственный таймер всегда считает секунды. Меняются только отсчитываемые интервалы. Избавлюсь от рекурсии.
+
+// Сохраним текущие результаты в XLS
+ipcMain.on( 'export-xls',  ()=> {
+    let result = [];
+    global.settings.pilots.forEach( function ( item, i) {
+        result[i] = {};
+        result[i].Num = i;
+        result[i].Name=item.Name;
+        result[i].Channel = item.Channel;
+        result[i].Group = item.Group;
+        item.Results.forEach( function(res, j) {
+            result[i]['P'+j] = res.place;
+            result[i]['T'+j] = res.time;
+            result[i]['L'+j] = res.laps;
+        });
+    });
+
+    const XLSX = require('xlsx'); // https://github.com/SheetJS/sheetjs
+    let wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(result, {header: ["Num", "Name", "Channel", "Group"]});
+    XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
+    const options = {
+        defaultPath: '~/*.xls',
+        title: 'Save XLS template',
+        buttonLabel: 'Сохранить',
+        filters: [
+            { name: 'xls',
+                extensions: ['xls']}
+        ]
+    };
+    showSaveDialog( mainWindow, options, wb, XLSX);
+});
+
+
 function initializeClock(id, counter, endFunc = function(){return 0}) {
 
     function updateClock() {
@@ -485,61 +606,81 @@ function finishRace(stat = null) {
         if( global.settings.obsUse ) changeSceneObs( global.settings.obsSceneWR);
         if( global.settings.withoutTVP ) {
             pausePrerace();
-            initializeClock('prepare-timer', 3, saveRace);
+            initializeClock('prepare-timer', 3, saveRaceReq);
         } // автопауза для заполнения таблицы результатов
-        else initializeClock('prepare-timer', 5, saveRace); // пауза для проверки результатов
+        else initializeClock('prepare-timer', 5, saveRaceReq); // пауза для проверки результатов
     }
     else nextRace();
     console.log( 'finishRace is completed');
 }
 
-
-function saveRace() {
+/*
+Запрос результатов гонки у рендера
+ */
+function saveRaceReq() {
     if( rules[global.settings.rules].savePlace+rules[global.settings.rules].saveTime+rules[global.settings.rules].saveLaps!==0 ) {
         mainWindow.webContents.send('query-results', 'nextRace');
     }
-
+    else nextRace();
 }
 
 function nextRace() {
     // переключить группу
-    let groupNext = groupCur+1;
-    if( groupNext>=global.settings.groups.length) {
-        groupNext=0;
+    groupCur++;
+
+    if( groupCur>=global.settings.groups.length) {
+        groupCur=0;
         raceLoop++;
-        if( global.settings.raceLoops ) {
-            if(raceLoop>=global.settings.raceLoops) {
-                store.set('groupCur', groupNext);
-                store.set('raceLoop', raceLoop);
-                return;
+        store.set('groupCur', groupCur);
+        store.set('raceLoop', raceLoop);
+        if( global.settings.raceLoops && raceLoop>=global.settings.raceLoops) {
+            //ИТОГОВЫЙ ИТОГ
+            showFinalResults();
+        }
+        else{
+            //промежуточный итог
+            if( rules[global.settings.rules].savePlace+rules[global.settings.rules].saveTime+rules[global.settings.rules].saveLaps===0 ) {
+                startPrerace();
+            }
+            else {
+                initializeClock('prepare-timer', 5, startPrerace);
+                showIntermediateResults();
             }
         }
     }
-
-
-    //const nextGroup = nextGroup(groupCur, global.settings.groups.length);
-    /*todo if( global.settings.multiGp ) showResultsPre(); */
-
-    startPrerace( groupNext );
-    mainWindow.webContents.send('show-prerace', { group : groupNext, round : raceLoop });
+    else {
+        // следующая группа
+        store.set('groupCur', groupCur);
+        startPrerace();
+    }
     console.log( 'nextRace is completed');
 }
 
-function startPrerace(group){
-    store.set('groupCur', group);
-    store.set('raceLoop', raceLoop);
+
+function showIntermediateResults() {
+    let res = prepareResultsForRender(global.settings.pilots);
+    mainWindow.webContents.send('show-results', { results : res, round : raceLoop });
+}
+
+
+function showFinalResults() {
+    let res = prepareResultsForRender(global.settings.pilots, 1);
+    mainWindow.webContents.send('show-results', { results : res, round : raceLoop });
+}
+
+function startPrerace(){
+    mainWindow.webContents.send('show-prerace', { group : groupCur, round : raceLoop });
 
     if( global.settings.obsUse ) {
         changeSceneObs( global.settings.obsSceneWR);
     }
-    console.log( 'Invitation G'+(group+1)+'/'+global.settings.groups.length+' L'+(raceLoop+1)+'/'+global.settings.raceLoops);
+    console.log( 'Invitation G'+(groupCur+1)+'/'+global.settings.groups.length+' L'+(raceLoop+1)+'/'+global.settings.raceLoops);
     clearInterval(timeInterval);
-    groupCur = group;
 
     // отправить пилотов в TVP
     if( !global.settings.withoutTVP ) {
-        for (let i = 0; i < global.settings.groups[group].length; i++) {
-            sendPilotName(i + 1, global.settings.groups[group][i]['Name']);
+        for (let i = 0; i < global.settings.groups[groupCur].length; i++) {
+            sendPilotName(i + 1, global.settings.groups[groupCur][i]['Name']);
         }
     }
 
@@ -716,6 +857,8 @@ function loadSettings() {
     global.settings.obsSceneWR = store.get('obsSceneWR', 'wr');
     global.settings.obsSceneBreak = store.get('obsSceneBreak', 'break');
     global.settings.rules = store.get('rules', 1);
+    groupCur = store.get('groupCur',0);
+    raceLoop = store.get('raceLoop',0);
 }
 
 /*
@@ -757,6 +900,9 @@ function saveSettings(arg) {
     store.set('obsSceneBreak', arg['obsSceneBreak']);
 }
 
+/*
+По дготовить имя файла для логов
+ */
 function filenameDate() {
     let date = new Date();
     let dd = date.getDate();
@@ -776,4 +922,69 @@ function filenameDate() {
     if (ss < 10) ss = '0' + ss;
 
     return yy + '-' + mm + '-' + dd + '--' + hh + '-' + min + '-' + ss;
+}
+
+function prepareResultsForRender(data, final =0) {
+    let ret = [];
+    data.forEach( function(item, i) {
+        ret[i] = {};
+        ret[i].Name = item.Name;
+        ret[i].Results = [];
+        if( final ) ret[i].Sums = { place:0, laps:0, time:0};
+        item.Results.forEach( function(res, j) {
+            ret[i].Results[j] = { place:false, laps:false, time:false };
+            if( rules[global.settings.rules].savePlace ) ret[i].Results[j].place = res.place;
+            if( rules[global.settings.rules].saveTime ) ret[i].Results[j].time = res.time;
+            if( rules[global.settings.rules].saveLaps ) ret[i].Results[j].laps = res.laps;
+            if( final ){
+                ret[i].Sums.place += res.place;
+                ret[i].Sums.time += res.time;
+                ret[i].Sums.laps += res.laps;
+            }
+
+        });
+    });
+
+    if( final ) {
+        if( global.settings.rules === 2 ) {
+            ret.sort( compareQ );
+            ret.forEach( function(res, i) {
+                ret[i].Sums.place=i+1;
+            });
+        }
+        if( global.settings.rules === 5 ) {
+            ret.sort( compareB4 );
+            ret.forEach( function(res, i) {
+                ret[i].Sums.place=i+1;
+            });
+        }
+
+    }
+    return ret;
+
+    function compare(a, b) {
+        if (a > b) return 1; // если первое значение больше второго
+        if (a === b) return 0; // если равны
+        if (a < b) return -1; // если первое значение меньше второго
+    }
+
+    function compareQ(a, b) {
+        if (a.Sums.laps < b.Sums.laps) return 1; // если первое значение больше второго
+        if (a.Sums.laps > b.Sums.laps) return -1; // если первое значение меньше второго
+
+        if (a.Sums.time < b.Sums.time ) return -1;
+        if (a.Sums.time === b.Sums.time ) return 0;
+        if (a.Sums.time > b.Sums.time ) return 1;
+    }
+
+    function compareB4(a, b) {
+        if (a.Sums.place > b.Sums.place) return 1; // если первое значение больше второго
+        if (a.Sums.place < b.Sums.place) return -1; // если первое значение меньше второго
+
+        if (a.Sums.time > b.Sums.time ) return -1;
+        if (a.Sums.time === b.Sums.time ) return 0;
+        if (a.Sums.time < b.Sums.time ) return 1;
+    }
+
+
 }

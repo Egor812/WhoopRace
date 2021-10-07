@@ -2648,6 +2648,8 @@ void startRace() {
     if (raceStarted == true) {
         return;
     }
+        raceResultPage = 0;
+        setOverlayMode(OVLMODE_NONE);
     // stop/init -> start
     finishSound.stop();
     initRaceVars();

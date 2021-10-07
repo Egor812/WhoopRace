@@ -89,3 +89,12 @@ color:lightgray;
 .rulesInfo{
   color:darkgray;
 }
+
+.result-cell{
+  margin-right:16px;
+  display: inline-block;
+}
+
+.result-table-intermediate{
+  display: inline-block;
+}
