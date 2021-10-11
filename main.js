@@ -69,7 +69,8 @@ const schema = {
 };
 
 
-
+// Если считаем места и место = 0 (не финишировал) - пишем max+1 место
+// TODO battle с 0 местом - врем я 0 - складываем и получаем маленькое среднее время - исправить
 const rules =[
     {},
     {
@@ -79,7 +80,8 @@ const rules =[
         saveTime: 0,
         savePlace: 0,
         minPilots: 1,
-        maxPilots: 100
+        maxPilots: 100,
+        showNext: 1,    // показывать на экране приглашения готовящуюся группу
     },
     {
         id: 2,
@@ -88,7 +90,8 @@ const rules =[
         saveTime: 1,
         savePlace: 0,
         minPilots: 1,
-        maxPilots: 100
+        maxPilots: 100,
+        showNext: 1
     },
     {},
     {
@@ -98,8 +101,10 @@ const rules =[
         saveLaps: 0,
         saveTime: 1,
         savePlace: 1,
-        minPilots: 6,
-        maxPilots: 8
+        minPilots: 6, /*todo*/
+        maxPilots: 8,
+        loops: 1,
+        showNext: 0
     },
     {
         id: 5,
@@ -109,9 +114,16 @@ const rules =[
         savePlace: 1,
         minPilots: 1,
         maxPilots: 4,
+        showNext: 1
     },
 
 ];
+
+const rulesFunc=[];
+rulesFunc[4] ={
+    fGroupSeed: seedDE8,
+    fGroupNext: seedDE8next,
+};
 
 const store = new Store({schema});
 loadSettings();
@@ -148,7 +160,7 @@ oscServer.on('message', function (msg) {
                 a++;
             }
         }
-        console.log(stat);
+        console.log('racefinished: '+stat);
         finishRace(stat);
         console.log('Finish message accepted');
     }
@@ -329,16 +341,24 @@ ipcMain.handle( 'parse-xls', async (event, arg)=> {
     const ws = wb.Sheets[first_sheet_name];
     const pilotsObj =  XLSX.utils.sheet_to_json(ws);
     let pilots = parseXLS(pilotsObj);
+    global.settings.pilots = pilots;
     store.set('pilots', pilots);
-    const groups = preparePilots(pilots);
+    const groups = preparePilots(pilots, global.settings.rules);
     global.settings.groups =  groups;
-    return {groups:groups, raceLoop:raceLoop, groupCur:groupCur};
+    return groups;
+});
+
+ipcMain.handle( 'repackGroups', async (event, arg) =>{
+    const groups = preparePilots(global.settings.pilots, arg);
+    global.settings.groups =  groups;
+    return groups;
 });
 
 /*
 Событие - запуск гонок
  */
 ipcMain.handle( 'submit-race', async (event, arg)=> {
+    if( rules[ global.settings.rules ].loops !== undefined ) arg.raceLoops = rules[ global.settings.rules ].loops;
     setSettings(arg);
     if( global.settings.groups.length===0) return 'Загрузите пилотов';
 
@@ -347,6 +367,11 @@ ipcMain.handle( 'submit-race', async (event, arg)=> {
         return 'Количество пилотов не соответствует выбранным правилам';
 
     saveSettings(arg);
+
+    global.settings.pilots.forEach( function ( item ) {
+        item.Results = [];
+    });
+
 
     raceLoop=0;
     groupCur=0;
@@ -362,6 +387,9 @@ ipcMain.handle( 'submit-race', async (event, arg)=> {
     if( arg['obsUse'] ){
         connectObs(arg['obsPort'], arg['obsPassword']);
     }
+
+    console.log('submit-race pilots: ', global.settings.pilots);
+
     return 1;
 });
 
@@ -406,7 +434,6 @@ ipcMain.on( 'start-prerace', (event, arg)=> {
 ipcMain.handle( 'stop-race', async ()=> {
     inCompetition=0;
     clearInterval(timeInterval);
-    return { raceLoop, groupCur };
 });
 
 ipcMain.on( 'add-prerace-time',  ()=> {
@@ -435,20 +462,25 @@ ipcMain.on( 'get-stat',  ()=> {
 
 
 ipcMain.handle( 'get-progress',  ()=> {
-    return { raceLoop, groupCur };
+
+    return { raceLoop: raceLoop, groupCur: groupCur, rulesName: getRulesName() };
 });
 
 // Получаем результаты гонки с формы и сохраняем
 ipcMain.on( 'get-results',  ( event, arg )=> {
-    console.log(arg);
-    console.log(global.settings.pilots);
-    for( let i=0; i<4; i++ ){
-        if( typeof global.settings.pilots[groupCur * 4 + i].Results === 'undefined' ){
-            global.settings.pilots[groupCur * 4 + i].Results = [];
+    console.log('get-results: ', arg);
+    console.log('get-results pilots: ', global.settings.pilots);
+    console.log('get-results groups: ', global.settings.groups);
+    let num;
+    for( let i=0; i<global.settings.groups[groupCur].length(); i++ ){
+        num = global.settings.groups[groupCur][i].Num;
+        if( typeof global.settings.pilots[num].Results === 'undefined' ){
+            global.settings.pilots[num].Results = [];
         }
-        global.settings.pilots[ groupCur*4+i ].Results[raceLoop]= arg['results'][i];
+        global.settings.pilots[num].Results[raceLoop]= arg['results'][i];
+
     }
-    console.log(global.settings.pilots);
+    console.log('get-results pilots new: ', global.settings.pilots);
 
     store.set('pilots', global.settings.pilots);
 
@@ -458,6 +490,7 @@ ipcMain.on( 'get-results',  ( event, arg )=> {
         console.log('Резултаты записаны в файл');
     });
     nextRace(); // хотел передать имя этой функции сюда как текстовый аргумент, но не получилось вызвать функцию
+    // изучить - https://ru.stackoverflow.com/questions/412715/%D0%97%D0%B0%D0%BF%D1%83%D1%81%D0%BA-%D1%84%D1%83%D0%BD%D0%BA%D1%86%D0%B8%D0%B8-%D0%BF%D0%BE-%D0%B7%D0%BD%D0%B0%D1%87%D0%B5%D0%BD%D0%B8%D1%8E-%D0%BF%D0%B5%D1%80%D0%B5%D0%BC%D0%B5%D0%BD%D0%BD%D0%BE%D0%B9
 });
 
 function parseXLS(xlsjson)
@@ -595,13 +628,15 @@ function startRace() {
 
 function finishRace(stat = null) {
     inRace = 0;
-    console.log('Finish G'+(groupCur+1)+'/'+global.settings.groups.length+' L'+(raceLoop+1)+'/'+global.settings.raceLoops);
+    console.log('finishRace: Finish G'+(groupCur+1)+'/'+global.settings.groups.length+' L'+(raceLoop+1)+'/'+global.settings.raceLoops);
     mainWindow.webContents.send('finish');
 
 
     // результаты
     //console.log(rules[global.settings.rules].savePlace+rules[global.settings.rules].saveTime+rules[global.settings.rules].saveLaps);
     if( rules[global.settings.rules].savePlace+rules[global.settings.rules].saveTime+rules[global.settings.rules].saveLaps!==0 ){
+        console.log( 'finishRace: ', stat );
+        console.log( 'finishRace: ', rules[global.settings.rules] );
         mainWindow.webContents.send('editresults', { stat : stat, rules : rules[global.settings.rules] });
         if( global.settings.obsUse ) changeSceneObs( global.settings.obsSceneWR);
         if( global.settings.withoutTVP ) {
@@ -624,10 +659,75 @@ function saveRaceReq() {
     else nextRace();
 }
 
+function findPilotInLoop(race, place) {
+    global.settings.pilots.forEach( function ( item, i) {
+        if( item.Results[race].place === place ) return i;
+    });
+}
+
+function findPilotInGroup(group, loop, place) {
+    global.settings.groups[group].forEach( function ( item, i) {
+        if( global.settings.pilots[item.Num].Results[loop].place === place ) return item.Num;
+    });
+    console.error('ERROR findPilotInGroup: не найден G',group,' L',loop, ' P', place  );
+}
+
+
+function seedDE8next(race){
+//0 - Gr 0
+//1 - Gr 1
+//2 - [0] Place 3, 4, [1] Place 3, 4
+//3 - [0] p 1,2, [1] p 1,2
+//4 - [3] p 3,4, [2] p 1,2
+//5 - [3] p 1,2, [4] p 1,2
+
+    switch( race ) {
+        case 2:
+            global.settings.groups[race] = [];
+            console.log( findPilotInGroup(0, 0, 3 ));
+            global.settings.groups[2][0] = global.settings.pilots[findPilotInGroup(0, 0, 3)];
+            global.settings.groups[2][1] = global.settings.pilots[findPilotInGroup(0, 0, 4)];
+            global.settings.groups[2][2] = global.settings.pilots[findPilotInGroup(1, 0, 3)];
+            global.settings.groups[2][3] = global.settings.pilots[findPilotInGroup(1, 0, 4)];
+            break;
+        case 3:
+            global.settings.groups[race] = [];
+            global.settings.groups[3][0] = global.settings.pilots[findPilotInGroup(0, 0, 1)];
+            global.settings.groups[3][1] = global.settings.pilots[findPilotInGroup(0, 0, 2)];
+            global.settings.groups[3][2] = global.settings.pilots[findPilotInGroup(1, 0, 1)];
+            global.settings.groups[3][3] = global.settings.pilots[findPilotInGroup(1, 0, 2)];
+            break;
+        case 4:
+            global.settings.groups[race] = [];
+            global.settings.groups[4][0] = global.settings.pilots[findPilotInGroup(2, 0, 1)];
+            global.settings.groups[4][1] = global.settings.pilots[findPilotInGroup(2, 0, 2)];
+            global.settings.groups[4][2] = global.settings.pilots[findPilotInGroup(3, 0, 3)];
+            global.settings.groups[4][3] = global.settings.pilots[findPilotInGroup(3, 0, 4)];
+            break;
+        case 5:
+            global.settings.groups[race] = [];
+            global.settings.groups[5][0] = global.settings.pilots[findPilotInGroup(4, 0, 1)];
+            global.settings.groups[5][1] = global.settings.pilots[findPilotInGroup(4, 0, 2)];
+            global.settings.groups[5][2] = global.settings.pilots[findPilotInGroup(3, 0, 1)];
+            global.settings.groups[5][3] = global.settings.pilots[findPilotInGroup(3, 0, 2)];
+            break;
+    }
+}
+
+function resultsDE8(race) {
+
+}
+
 function nextRace() {
+    //if( rulesFunc[ global.settings.rules ].fRaceResults !== undefined) rulesFunc[ global.settings.rules ].fRaceResults(groupCur);
+
     // переключить группу
     groupCur++;
 
+    if( rulesFunc[ global.settings.rules ].fGroupNext !== undefined)  rulesFunc[ global.settings.rules ].fGroupNext(groupCur);
+
+
+    // следующий раунд
     if( groupCur>=global.settings.groups.length) {
         groupCur=0;
         raceLoop++;
@@ -669,7 +769,7 @@ function showFinalResults() {
 }
 
 function startPrerace(){
-    mainWindow.webContents.send('show-prerace', { group : groupCur, round : raceLoop });
+    mainWindow.webContents.send('show-prerace', { group : groupCur, round : raceLoop, showNext : rules[ global.settings.rules ].showNext });
 
     if( global.settings.obsUse ) {
         changeSceneObs( global.settings.obsSceneWR);
@@ -711,6 +811,22 @@ function pausePrerace() {
     }
 }
 
+function seedDE8(pilotsObj) {
+    let pilotsG = [];
+        pilotsG[ 0 ]=[];
+        pilotsG[ 1 ]=[];
+        pilotsG[ 0 ].push(pilotsObj[1]);
+        pilotsG[ 0 ].push(pilotsObj[2]);
+        pilotsG[ 0 ].push(pilotsObj[4]);
+        pilotsG[ 0 ].push(pilotsObj[6]);
+        pilotsG[ 1 ].push(pilotsObj[0]);
+        pilotsG[ 1 ].push(pilotsObj[3]);
+        pilotsG[ 1 ].push(pilotsObj[5]);
+        pilotsG[ 1 ].push(pilotsObj[7]);
+    return pilotsG;
+}
+
+
 
 // перевести пилотов полученных из XLS / настроек в массив [группа] = [пилот1], [пилот2], ...
 // XLS
@@ -719,32 +835,45 @@ function pausePrerace() {
 // Channel - для удобства - чтобы мы могли записать пилота с одним рабочим каналом в нужную ячейку
 // Группа - 1..Z
 
-function preparePilots(pilotsObj) {
+function preparePilots(pilotsObj, rulesNum) {
     let pilotsG = [];
     if( pilotsObj === undefined ) return pilotsG;
-    for (let i = 0; i < pilotsObj.length; i++) {
-        if( i<4 ){
-            if( pilotsObj[i+pilotsObj.length-4]['Name']!==undefined)
-                pilotsObj[i]['Судьи'] = pilotsObj[i+pilotsObj.length-4]['Name'];
-            else
-                pilotsObj[i]['Судьи'] = '-';
-        }
-        else{
-            if( pilotsObj[i-4]['Name']!==undefined)
-                pilotsObj[i]['Судьи'] = pilotsObj[i-4]['Name'];
-            else
-                pilotsObj[i]['Судьи'] = '-';
-        }
+    pilotsObj = addJudges(pilotsObj);
 
+    if( rulesFunc[ rulesNum ].fGroupSeed !== undefined) return rulesFunc[ rulesNum ].fGroupSeed(pilotsObj);
+
+    for (let i = 0; i < pilotsObj.length; i++) {
+        //Создать группу
         if(  pilotsG[ pilotsObj[i]['Group'] ] === undefined)  {
             pilotsG[ pilotsObj[i]['Group'] ]=[];
         }
+        //Добавить пилота в группу
         pilotsG[ pilotsObj[i]['Group'] ].push(pilotsObj[i]);
     }
+    // Удалить пустые группы - сделать порядок 0,1...
     for( let i = 0; i<pilotsG.length; i++){
         if(pilotsG[i] === undefined) pilotsG.splice(i,1);
     }
+    // pilotsG[group]{Name, Chanel, Group, Num}
     return pilotsG;
+}
+
+// Назначить судей
+function addJudges(pilotsObj) {
+    for (let i = 0; i < pilotsObj.length; i++) {
+        if (i < 4) {
+            if (pilotsObj[i + pilotsObj.length - 4]['Name'] !== undefined)
+                pilotsObj[i]['Судьи'] = pilotsObj[i + pilotsObj.length - 4]['Name'];
+            else
+                pilotsObj[i]['Судьи'] = '-';
+        } else {
+            if (pilotsObj[i - 4]['Name'] !== undefined)
+                pilotsObj[i]['Судьи'] = pilotsObj[i - 4]['Name'];
+            else
+                pilotsObj[i]['Судьи'] = '-';
+        }
+    }
+    return pilotsObj;
 }
 
 /*
@@ -842,6 +971,7 @@ function changeSceneObs(name) {
 Загрузка настроек из хранилища
  */
 function loadSettings() {
+    // global - эти переменные протаскиваются в рендер
     global.settings.judges = store.get('judges', 0);
     global.settings.withoutTVP = store.get('withoutTVP', 0);
     global.settings.prepareTimer = store.get('prepareTimer', 120);
@@ -849,7 +979,6 @@ function loadSettings() {
     global.settings.raceLaps = store.get('raceLaps', 0);
     global.settings.pilots = store.get('pilots');
     global.settings.raceLoops = store.get('raceLoops', 0);
-    global.settings.groups = preparePilots(global.settings.pilots);
     global.settings.obsUse = store.get('obsUse', 0);
     global.settings.obsPort = store.get('obsPort', 4444);
     global.settings.obsPassword = store.get('obsPassword', '1234');
@@ -857,6 +986,7 @@ function loadSettings() {
     global.settings.obsSceneWR = store.get('obsSceneWR', 'wr');
     global.settings.obsSceneBreak = store.get('obsSceneBreak', 'break');
     global.settings.rules = store.get('rules', 1);
+    global.settings.groups = preparePilots(global.settings.pilots, global.settings.rules);
     groupCur = store.get('groupCur',0);
     raceLoop = store.get('raceLoop',0);
 }
@@ -924,9 +1054,9 @@ function filenameDate() {
     return yy + '-' + mm + '-' + dd + '--' + hh + '-' + min + '-' + ss;
 }
 
-function prepareResultsForRender(data, final =0) {
+function prepareResultsForRender(pilots, final =0) {
     let ret = [];
-    data.forEach( function(item, i) {
+    pilots.forEach( function(item, i) {
         ret[i] = {};
         ret[i].Name = item.Name;
         ret[i].Results = [];
@@ -946,20 +1076,38 @@ function prepareResultsForRender(data, final =0) {
     });
 
     if( final ) {
-        if( global.settings.rules === 2 ) {
+        if( global.settings.rules === 2 ) { // квалификация
             ret.sort( compareQ );
             ret.forEach( function(res, i) {
                 ret[i].Sums.place=i+1;
             });
         }
-        if( global.settings.rules === 5 ) {
+        if( global.settings.rules === 5 ) { // турнир
             ret.sort( compareB4 );
+            ret.forEach( function(res, i) {
+                ret[i].Sums.place=i+1;
+            });
+        }
+        if( global.settings.rules === 4) {
+            // 2 - p3 -> 7, p4 -> 8,
+            // 4 - p3 -> 5, p4 -> 6
+            // 5 - p1..4
+            ret[findPilotInGroup(2, 0, 4)].Sums.place=8;
+            ret[findPilotInGroup(2, 0, 3)].Sums.place=7;
+            ret[findPilotInGroup(4, 0, 4)].Sums.place=6;
+            ret[findPilotInGroup(4, 0, 3)].Sums.place=5;
+            ret[findPilotInGroup(5, 0, 4)].Sums.place=4;
+            ret[findPilotInGroup(5, 0, 3)].Sums.place=3;
+            ret[findPilotInGroup(5, 0, 2)].Sums.place=2;
+            ret[findPilotInGroup(5, 0, 1)].Sums.place=1;
+            ret.sort( compareDE8 );
             ret.forEach( function(res, i) {
                 ret[i].Sums.place=i+1;
             });
         }
 
     }
+    console.log( ret );
     return ret;
 
     function compare(a, b) {
@@ -969,22 +1117,35 @@ function prepareResultsForRender(data, final =0) {
     }
 
     function compareQ(a, b) {
-        if (a.Sums.laps < b.Sums.laps) return 1; // если первое значение больше второго
-        if (a.Sums.laps > b.Sums.laps) return -1; // если первое значение меньше второго
+        if (a.Sums.laps < b.Sums.laps) return 1;
+        if (a.Sums.laps > b.Sums.laps) return -1;
 
+        // При равной сумме кругов учтем среднее время круга
+        // Если в каком-то раунде время = 0 ( пролетел 0 кругов), то ничего страшного
         if (a.Sums.time < b.Sums.time ) return -1;
         if (a.Sums.time === b.Sums.time ) return 0;
         if (a.Sums.time > b.Sums.time ) return 1;
     }
 
     function compareB4(a, b) {
-        if (a.Sums.place > b.Sums.place) return 1; // если первое значение больше второго
-        if (a.Sums.place < b.Sums.place) return -1; // если первое значение меньше второго
+        if (a.Sums.place > b.Sums.place) return 1;
+        if (a.Sums.place < b.Sums.place) return -1;
 
+        // При равной сумме кругов учтем среднее время круга
+        // Если в каком-то раунде время = 0 ( пролетел 0 кругов), то ничего страшного
         if (a.Sums.time > b.Sums.time ) return -1;
         if (a.Sums.time === b.Sums.time ) return 0;
         if (a.Sums.time < b.Sums.time ) return 1;
     }
 
+    function compareDE8(a, b) {
+        if (a.Sums.place > b.Sums.place) return 1;
+        if (a.Sums.place < b.Sums.place) return -1;
+    }
 
+
+}
+
+function getRulesName() {
+    return rules[ global.settings.rules ].name;
 }

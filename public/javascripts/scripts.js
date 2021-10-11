@@ -1,17 +1,25 @@
 let clockElm;
 
 
-function showMenu(settings, raceLoop, groupCur) {
+function showMenu(settings, raceLoop, groupCur, rulesName) {
     setSettings(settings);
-    rulesChange();
-    document.getElementById('race-progress').innerHTML = `Начинается круг ${raceLoop+1} группа ${groupCur+1}`;
+    showPilotsAll(settings.groups);
+    rulesChangeRender();
+    if( raceLoop<settings.raceLoops) {
+        document.getElementById('race-progress').innerHTML = `${rulesName} Продолжить с раунда ${raceLoop+1} и группы ${groupCur+1}`;
+        $('#resume-race').show();
+    }
+    else {
+        document.getElementById('race-progress').innerHTML = `Гонка завершена`;
+        $('#resume-race').hide();
+    }
     $('#menu').show();
 }
 
 /*
 Страница приглашения пилотов
  */
-function prerace(group=0, round = 0) {
+function prerace(group=0, round = 0, showNext= 1) {
 
     $('#race').show();
     $('#menu').hide();
@@ -34,7 +42,6 @@ function prerace(group=0, round = 0) {
     const elmPagination = $('#pagination');
     for( let i=0; i<4; i++) {
         elmPilots[i] = $('#pilot-'+(i+1)+' .name');
-        elmPilotsNext[i] = $('#pilot-next-'+(i+1));
     }
 
     $('.group-pilots-results').hide();
@@ -46,11 +53,18 @@ function prerace(group=0, round = 0) {
         $('#pilot-'+(i+1)+' > .ch').text(groups[groupThis][i]['Channel']);
         if( settings.judges) $('#pilot-'+(i+1)+' > .judge').text(groups[groupThis][i]['Судьи']);
     }
-    groupNext = groupThis+1;
-    if( groupNext>=groupMax) groupNext=0;
-    for( let i=0; i<groups[groupNext].length; i++){
-        elmPilotsNext[i].text(groups[groupNext][i]['Name']);
-        elmPilotsNext[i].text(groups[groupNext][i]['Name']);
+    if( showNext ) {
+        groupNext = groupThis + 1;
+        if (groupNext >= groupMax) groupNext = 0;
+        for (let i = 0; i < groups[groupNext].length; i++) {
+            elmPilotsNext[i] = $('#pilot-next-'+(i+1));
+            elmPilotsNext[i].text(groups[groupNext][i]['Name']);
+        }
+        $('#group-next').show();
+    }
+    else{
+        $('#group-next').hide();
+
     }
 
     //clockElm = document.getElementById('prepare-timer');
@@ -157,6 +171,7 @@ function showResults(data, loop) {
     HTMLOUT.innerHTML = x;
 }
 
+// Вывести группы пилотов в меню
 function showPilotsAll(pilotsG) {
     if( pilotsG === undefined ) return;
     const HTMLOUT = document.getElementById('list-pilots');
@@ -176,8 +191,11 @@ function showPilotsAll(pilotsG) {
     HTMLOUT.innerHTML = x;
 }
 
+function getFormRulesVal() {
+    return Number($("#rulesSelector option:selected").val());
+}
 
-function rulesChange()
+function rulesChangeRender()
 {
     $( ".rulesInfo" ).each(function() {
         $( this ).hide();
@@ -202,13 +220,10 @@ function setSettings(settings) {
     $('#obsSceneTVP').val(settings.obsSceneTVP);
     $('#obsSceneWR').val(settings.obsSceneWR);
     $('#obsSceneBreak').val(settings.obsSceneBreak);
-
-
     $('#inputPrepareTime').val(settings.prepareTimer);
     $('#inputRaceTime').val(settings.raceTimer);
     $('#inputRaceLaps').val(settings.raceLaps);
     $('#inputLoops').val(settings.raceLoops);
-    showPilotsAll(settings.groups);
 }
 
 /*
@@ -274,15 +289,19 @@ ipcRenderer.on('show-race', ()=> {
 });
 
 ipcRenderer.on('show-prerace', (event, arg)=> {
-    prerace(arg['group'], arg['round']);
+    prerace(arg['group'], arg['round'], arg['showNext']);
 });
 
 ipcRenderer.on('open-dialog-paths-selected', (event, arg)=> {
     setup.handler.outputSelectedPathsFromOpenDialog(arg);
     // запрос с промисом
     ipcRenderer.invoke('parse-xls', arg).then( result => {
-        showMenu( settings, result.raceLoop, result.groupCur);
-        showPilotsAll(result.groups);
+        showPilotsAll(result);
+        $('menu-this-race').hide();
+        /*ipcRenderer.invoke('get-progress').then( result  => {
+            showMenu( settings, result.raceLoop, result.groupCur, result.rulesName);
+        });*/
+
     });
 });
 
@@ -356,8 +375,11 @@ window.setup = window.setup || {}, // откуда я это взял? как э
             exitRace: function(){
                 $('#race').hide();
                 $('#results').hide();
-                ipcRenderer.invoke('stop-race').then( result => {
-                    showMenu( settings, result['raceLoop'], result['groupCur']);
+                ipcRenderer.invoke('stop-race').then( () => {
+                    ipcRenderer.invoke('get-progress').then( result  => {
+                        $('menu-this-race').show();
+                        showMenu( settings, result.raceLoop, result.groupCur, result.rulesName);
+                    });
                 });
             },
 
@@ -449,13 +471,18 @@ window.setup = window.setup || {}, // откуда я это взял? как э
                     }
                 });
                 $( "#rulesSelector" ).change( function() {
-                    rulesChange();
+
+                    ipcRenderer.invoke('repackGroups', getFormRulesVal() ).then( (result) => {
+                        console.log(result);
+                        showPilotsAll(result);
+                    });
+                    rulesChangeRender();
                 });
                 //.trigger( "change" );
 
                 $(function() {  // on ready
                     ipcRenderer.invoke('get-progress').then( result  => {
-                        showMenu( settings, result['raceLoop'], result['groupCur']);
+                        showMenu( settings, result.raceLoop, result.groupCur, result.rulesName);
                     });
                 });
 
