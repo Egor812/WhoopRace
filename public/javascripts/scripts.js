@@ -1,6 +1,5 @@
 let clockElm;
 
-
 function showMenu(settings, raceLoop, groupCur, rulesName) {
     setSettings(settings);
     showPilotsAll(settings.groups);
@@ -51,11 +50,12 @@ function prerace(group=0, round = 0, showNext= 1) {
     for( let i=0; i<groups[groupThis].length; i++){
         elmPilots[i].text(groups[groupThis][i]['Name']);
         $('#pilot-'+(i+1)+' > .ch').text(groups[groupThis][i]['Channel']);
-        if( settings.judges) $('#pilot-'+(i+1)+' > .judge').text(groups[groupThis][i]['Судьи']);
+        if( settings.judges) $('#pilot-'+(i+1)+' > .judge').text(groups[groupThis][i]['Judges']);
     }
+
+    groupNext = groupThis + 1;
+    if (groupNext >= groupMax) groupNext = 0;
     if( showNext ) {
-        groupNext = groupThis + 1;
-        if (groupNext >= groupMax) groupNext = 0;
         for (let i = 0; i < groups[groupNext].length; i++) {
             elmPilotsNext[i] = $('#pilot-next-'+(i+1));
             elmPilotsNext[i].text(groups[groupNext][i]['Name']);
@@ -72,26 +72,18 @@ function prerace(group=0, round = 0, showNext= 1) {
 
     switchToPreraceTimer();
 
-    let pagination='<ul class="pagination">';
+    let pagination='';
     let sel;
-    pagination +=
-        '<li data-page="'+String(groupThis-1)+'" class="page-item">'+
-            '<span class="page-link pagination-dark"><span aria-hidden="true">&laquo;</span></span>'+
-        '</li>';
+    pagination += '<button data-page="'+String(groupThis-1)+'" type="button" class="btn btn-outline-primary pagination-group">&laquo;</button>';
     for( let i=0; i<groups.length; i++) {
-        if( i===groupThis) sel='active';
-        else sel ='';
-        pagination += '<li data-page="'+i+'" class="page-item '+sel+'"><span class="page-link pagination-dark">' + (i+1) + '</span></li>';
+        if( i===groupThis) sel='btn-primary'; else sel='btn-outline-primary';
+        pagination += '<button data-page="'+i+'" type="button" class="btn '+sel+' pagination-group">'+ (i+1) +'</button>';
     }
-    pagination +=
-        '<li data-page="'+groupNext+'" class="page-item">'+
-        '<span class="page-link pagination-dark"><span aria-hidden="true">&raquo;</span></span>'+
-        '</li>';
-
-    pagination += '</ul>';
+    pagination += '<button data-page="'+groupNext+'" type="button" class="btn btn-outline-primary pagination-group">&raquo;</button>';
+    pagination += '</div>';
     elmPagination.html(pagination);
 
-
+    $("#rerace").data('group', groupThis );
 
     let audio = document.getElementById('wav-invite');
     audio.addEventListener('ended', () => {
@@ -124,6 +116,10 @@ function race() {
     }
 }
 
+/*
+Результаты после вылета
+data[][ pilot, pos, lps, total ]
+ */
 function results(data, rules) {
     switchToPreraceTimer();
     console.log( 'rules:'+rules);
@@ -141,6 +137,7 @@ function results(data, rules) {
     console.log(data);
 }
 
+// data[][ Results[laps pos time], Sums[pos ] ]
 function showResults(data, loop) {
     console.log(data);
     $('#race').hide();
@@ -151,19 +148,21 @@ function showResults(data, loop) {
 
     const HTMLOUT = document.getElementById('result-table');
     let x='';
-    data.forEach( function(item) {
-        x += '<span class="setup-pilots-badge badge badge-warning" style="width:120px; margin-right:30px">' + item.Name + '</span>';
-        item.Results.forEach( function(res) {
-           x += '<span class="result-table-intermediate">';
-           if( res.laps!==false ) x += '<span class="result-cell" style="width: 20px;">'+res.laps+'</span>';
-           if( res.place!==false ) x += '<span class="result-cell" style="width: 20px;">'+res.place+'</span>';
-           if( res.time!==false ) x += '<span class="result-cell" style="width: 60px;">'+res.time+'</span>';
-           x += '</span>';
-        });
-        if( typeof item.Sums !== 'undefined' ) {
+    data.forEach( function(pilot) {
+        x += '<span class="setup-pilots-badge badge badge-warning" style="width:120px; margin-right:30px">' + pilot.Name + '</span>';
+        for(let i = 0; i < pilot.Results.length; i++){
+            x += '<span class="result-table-intermediate">';
+            if( pilot.Results[i] !== undefined) {
+                if (pilot.Results[i].laps !== false) x += '<span class="result-cell" style="width: 20px;">' + pilot.Results[i].laps + '</span>';
+                if (pilot.Results[i].pos !== false) x += '<span class="result-cell" style="width: 20px;">' + pilot.Results[i].pos + '</span>';
+                if (pilot.Results[i].time !== false) x += '<span class="result-cell" style="width: 60px;">' + pilot.Results[i].time + '</span>';
+            }
+            x += '</span>';
+        }
+        if( typeof pilot.Sums !== 'undefined' ) {
             let style ='';
-            if( item.Sums.place<=3 ) style='style="color:red"';
-            x += `<span class="result-table-final" ${style}>` + item.Sums.place + '</span>';
+            if( pilot.Sums.pos<=3 ) style='style="color:red"';
+            x += `<span class="result-table-final" ${style}>` + pilot.Sums.pos + '</span>';
         }
         x +='<br>';
     });
@@ -172,6 +171,7 @@ function showResults(data, loop) {
 }
 
 // Вывести группы пилотов в меню
+// pilotsG[][][Name, ]
 function showPilotsAll(pilotsG) {
     if( pilotsG === undefined ) return;
     const HTMLOUT = document.getElementById('list-pilots');
@@ -250,17 +250,17 @@ function getSettingsFromForm(){
     return args;
 }
 
+/*
+return Array [0..3][laps, pos, time]
+ */
 function getResultsFromForm() {
     let results=[];
     for( let i=1; i<=4; i++){
         results[i-1] = {
             laps : Number( $('#gpl-'+i).val()),
-            place : Number( $('#gpp-'+i).val() ),
+            pos : Number( $('#gpp-'+i).val() ),
             time : Number( $('#gpt-'+i).val() )
         };
-        /*results[i-1].laps = Number( $('#gpl-'+i).val() );
-        results[i-1].place = Number( $('#gpp-'+i).val() );
-        results[i-1].time = Number( $('#gpt-'+i).val() );*/
     }
     return results;
 }
@@ -310,7 +310,7 @@ ipcRenderer.on('query-results', ()=> {
 });
 
 ipcRenderer.on('show-results', (event, arg)=> {
-    showResults(arg['results'], arg['round']);
+    showResults( arg['results'], arg['round'] );
 });
 
 
@@ -404,6 +404,12 @@ window.setup = window.setup || {}, // откуда я это взял? как э
                 $('#race').show();
             },
 
+            rerace: function(){
+                let group = Number( $('#rerace').data('group') );
+                ipcRenderer.send('start-prerace',{ group : group });
+                $('#race').show();
+            },
+
             // увеличить время на подготовку
             addPreRaceTime: function() {
                 ipcRenderer.send('add-prerace-time');
@@ -418,7 +424,6 @@ window.setup = window.setup || {}, // откуда я это взял? как э
             exportXLS: function() {
                 ipcRenderer.send('export-xls');
             },
-
 
             //EVENTS
             init: function() {
@@ -455,8 +460,11 @@ window.setup = window.setup || {}, // откуда я это взял? как э
                 $('#export-xls').click( function () {
                     setup.handler.exportXLS();
                 });
-                $('#pagination').on('click', '.page-item', function () {
+                $('#pagination').on('click', '.pagination-group', function () {
                     setup.handler.changePage(this);
+                });
+                $('#rerace').on('click', '#rerace', function () {
+                    setup.handler.rerace();
                 });
                 addEventListener("keyup", function(event) {
                     if (event.code === 'KeyQ') {
@@ -471,7 +479,6 @@ window.setup = window.setup || {}, // откуда я это взял? как э
                     }
                 });
                 $( "#rulesSelector" ).change( function() {
-
                     ipcRenderer.invoke('repackGroups', getFormRulesVal() ).then( (result) => {
                         console.log(result);
                         showPilotsAll(result);
@@ -479,6 +486,19 @@ window.setup = window.setup || {}, // откуда я это взял? как э
                     rulesChangeRender();
                 });
                 //.trigger( "change" );
+                $('.group-pilots-place').change( function () {
+                    let val = $(this).val();
+                    let id  = this.id;
+                    console.log( id );
+                    $( ".group-pilots-place" ).each(function() {
+                        if( $( this ).val() === val && $( this ).attr( 'id' ) !== id) {
+                            $( this ).css( "color", "red" );
+                        }
+                        else{
+                            $( this ).css( "color", "black" );
+                        }
+                    });
+                });
 
                 $(function() {  // on ready
                     ipcRenderer.invoke('get-progress').then( result  => {

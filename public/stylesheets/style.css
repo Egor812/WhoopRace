@@ -62,10 +62,6 @@ a {
   font-weight: bold;
 }
 
-.pagination-dark{
-  background:black;
-  border: 1px solid #4976a4;
-}
 
 #group-pilots{
   padding:1em
@@ -75,11 +71,6 @@ a {
 color:lightgray;
   padding: 1em 0 1em 0;
   font-size: 1.5em;
-}
-
-#pagination{
-  position: absolute;
-  bottom: 0;
 }
 
 .helptable > .col{
@@ -97,4 +88,5 @@ color:lightgray;
 
 .result-table-intermediate{
   display: inline-block;
+  width: 120px;
 }
