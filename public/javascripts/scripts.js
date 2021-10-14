@@ -23,6 +23,8 @@ function prerace(group=0, round = 0, showNext= 1) {
     $('#race').show();
     $('#menu').hide();
     $('#results').hide();
+    $('#rerace').hide();
+    $('#pagination').show();
 
     let groups = settings.groups;
     //let prepareTimer = settings.prepareTimer;
@@ -39,18 +41,20 @@ function prerace(group=0, round = 0, showNext= 1) {
     const htmlGroup = document.getElementById('group');
     const htmlRound = document.getElementById('round');
     const elmPagination = $('#pagination');
-    for( let i=0; i<4; i++) {
-        elmPilots[i] = $('#pilot-'+(i+1)+' .name');
-    }
 
     $('.group-pilots-results').hide();
 
     htmlGroup.innerHTML= `Группа ${(groupThis+1)}`;
     htmlRound.innerHTML= `Раунд ${(round+1)}/${raceLoops}`;
-    for( let i=0; i<groups[groupThis].length; i++){
-        elmPilots[i].text(groups[groupThis][i]['Name']);
-        $('#pilot-'+(i+1)+' > .ch').text(groups[groupThis][i]['Channel']);
-        if( settings.judges) $('#pilot-'+(i+1)+' > .judge').text(groups[groupThis][i]['Judges']);
+    for( let i=0; i<4; i++ ){
+        elmPilots[i] = $('#pilot-'+(i+1)+' .name');
+        if( i<groups[groupThis].length ) {
+            $('#pilot-'+(i+1)).show();
+            elmPilots[i].text(groups[groupThis][i]['Name']);
+            $('#pilot-' + (i + 1) + ' > .ch').text(groups[groupThis][i]['Channel']);
+            if (settings.judges) $('#pilot-' + (i + 1) + ' > .judge').text(groups[groupThis][i]['Judges']);
+        }
+        else $('#pilot-'+(i+1)).hide();
     }
 
     groupNext = groupThis + 1;
@@ -134,6 +138,8 @@ function results(data, rules) {
         }
     }
     $('.group-pilots-results').css( "display", "block" );
+    $('#rerace').show();
+    $('#pagination').hide();
     console.log(data);
 }
 
@@ -425,6 +431,20 @@ window.setup = window.setup || {}, // откуда я это взял? как э
                 ipcRenderer.send('export-xls');
             },
 
+            // проверка ввода мест на экране результатов вылета
+            validateResults: function(elm) {
+                let val = $(elm).val();
+                let id = elm.id;
+                console.log(id);
+                $(".group-pilots-place").each(function () {
+                    if ($(this).val() === val && $(this).attr('id') !== id) {
+                        $(this).css("color", "red");
+                    } else {
+                        $(this).css("color", "black");
+                    }
+                });
+            },
+
             //EVENTS
             init: function() {
                 $('#showOpendialog').click( function () {
@@ -487,17 +507,7 @@ window.setup = window.setup || {}, // откуда я это взял? как э
                 });
                 //.trigger( "change" );
                 $('.group-pilots-place').change( function () {
-                    let val = $(this).val();
-                    let id  = this.id;
-                    console.log( id );
-                    $( ".group-pilots-place" ).each(function() {
-                        if( $( this ).val() === val && $( this ).attr( 'id' ) !== id) {
-                            $( this ).css( "color", "red" );
-                        }
-                        else{
-                            $( this ).css( "color", "black" );
-                        }
-                    });
+                    setup.handler.validateResults(this);
                 });
 
                 $(function() {  // on ready

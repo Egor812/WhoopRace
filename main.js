@@ -132,7 +132,8 @@ rulesFunc[4] ={
     fRaceNext: seedDE8group,    // создать группу для вылета
     fGroupsOnLoad: seedDE8groupsOnLoad, // создать группы для вывода на экран загрузки
     fFinalPos: posDE8,      // подвести результаты
-    fJudges: setJudgesDE8   // назначить судей
+    fJudges: setJudgesDE8,   // назначить судей
+    fFindRace: findRaceDE8 // найти следующий вылет после загрузки xls
 };
 
 const store = new Store({schema});
@@ -349,7 +350,7 @@ ipcMain.handle( 'parse-xls', async (event, arg)=> {
     const wb = XLSX.readFile(arg[0]);
     const first_sheet_name = wb.SheetNames[0];
     const ws = wb.Sheets[first_sheet_name];
-    const pilotsObj =  XLSX.utils.sheet_to_json(ws);
+    const pilotsObj =  XLSX.utils.sheet_to_json(ws, {defval: false});
     let pilots = parseXLS(pilotsObj);
     global.settings.groups = preparePilotsGroups(pilots, global.settings.rules);
     global.settings.pilots = addJudges(pilots, global.settings.rules);
@@ -511,15 +512,20 @@ function parseXLS(xlsjson)
     let curLoop;
     let result = [];
     let fSetPos = 0;
-    xlsjson.forEach( function ( item, i ) {
+    xlsjson.forEach( function ( pilot, i ) {
         let p=0;
         let pos, time, laps;
         result[i] = {};
         result[i].Results = [];
-        Object.keys(item).map(function(objectKey, index) {
-            let value = item[objectKey];
+        Object.keys(pilot).map(function(objectKey, index) {
+            if( objectKey === 'Num' )  { // Num должен быть от 0 и попорядку
+                result[i][objectKey] = i;
+                return;
+            }
+            let value = pilot[objectKey];
             if (index<=3 ) result[i][objectKey] = value;
             else {
+                if( value === false ) return;
                 p = (index-4) % 3;
                 switch(p) {
                     case 0:
@@ -530,47 +536,82 @@ function parseXLS(xlsjson)
                         break;
                     case 2:
                         laps= value;
-                        result[i].Results.push({ pos: pos, time:time, laps:laps})
+                        result[i].Results[ Math.floor((index-4)/3) ]={ pos: pos, time:time, laps:laps};
                 }
             }
         });
-        curLoop = result[i].Results.length;
-        if( curLoop < loop) {
-            fSetPos = 1;
-            groupCur = result[i].Group-1;
-            raceLoop = curLoop;
-        }
-        else loop = curLoop;
     });
-    if( !fSetPos ) {
-        raceLoop = loop;
-        groupCur = 0;
+
+
+    if( rulesFunc[ global.settings.rules].fFindRace !== undefined ) {
+        let pos = rulesFunc[ global.settings.rules].fFindRace(result);
+        raceLoop = pos.loop;
+        groupCur = pos.group;
     }
+    else{
+        result.forEach( function ( pilot, i ) {
+            curLoop = result[i].Results.length;
+            if( curLoop < loop) { // если этот пилот пролетел меньше вылетов, чем предыдущий
+                fSetPos = 1;
+                groupCur = result[i].Group-1;
+                raceLoop = curLoop;
+            }
+            else loop = curLoop;
+        });
+        if( !fSetPos ) {
+            raceLoop = loop;
+            groupCur = 0;
+        }
+    }
+
     //console.log( JSON.parse(JSON.stringify(obj)) );
     console.log(result, raceLoop, groupCur);
+    //console.log( result[0]);
+
     return result;
+}
+
+function findRaceDE8(pilots)
+{
+    let max = 0;
+    let len;
+    pilots.forEach( function ( pilot, i ) {
+        len = pilot.Results.length;
+        if( len>max ) max = len;
+    });
+    return {loop: max, group: 0};
 }
 
 
 // Сохраним текущие результаты в XLS
 ipcMain.on( 'export-xls',  ()=> {
     let result = [];
-    global.settings.pilots.forEach( function ( item, i) {
+    global.settings.pilots.forEach( function ( pilot, i) {
         result[i] = {};
         result[i].Num = i;
-        result[i].Name=item.Name;
-        result[i].Channel = item.Channel;
-        result[i].Group = item.Group;
-        item.Results.forEach( function(res, j) {
-            result[i]['P'+j] = res.pos;
-            result[i]['T'+j] = res.time;
-            result[i]['L'+j] = res.laps;
-        });
+        result[i].Name=pilot.Name;
+        result[i].Channel = pilot.Channel;
+        result[i].Group = pilot.Group;
+        for( let j=0; j<raceLoop; j++){
+        //pilot.Results.forEach( function(res, j) {
+            if( pilot.Results[j] !== undefined && pilot.Results[j] !== null ) {
+                result[i]['P' + j] = pilot.Results[j].pos;
+                result[i]['T' + j] = pilot.Results[j].time;
+                result[i]['L' + j] = pilot.Results[j].laps;
+            }
+        }
     });
+
+    let header = ["Num", "Name", "Channel", "Group"];
+    for( let j=0; j<raceLoop; j++){
+        header.push('P' + j);
+        header.push('T' + j);
+        header.push('L' + j);
+    }
 
     const XLSX = require('xlsx'); // https://github.com/SheetJS/sheetjs
     let wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.json_to_sheet(result, {header: ["Num", "Name", "Channel", "Group"]});
+    const ws = XLSX.utils.json_to_sheet(result, {header: header});
     XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
     const options = {
         defaultPath: '~/*.xls',
@@ -653,7 +694,8 @@ function finishRace(stat = null)
     if( rules[global.settings.rules].savePlace+rules[global.settings.rules].saveTime+rules[global.settings.rules].saveLaps!==0 ){
         console.log( 'finishRace: ', stat );
         console.log( 'finishRace: ', rules[global.settings.rules] );
-        stat=zeroCorrection(stat);
+        if( stat.length === 0) stat = emptyCorrection( global.settings.groups[groupCur].length );
+        else stat=zeroCorrection(stat);
         console.log( 'correction:', stat);
         mainWindow.webContents.send('editresults', { stat : stat, rules : rules[global.settings.rules] });
         if( global.settings.obsUse ) changeSceneObs( global.settings.obsSceneWR);
@@ -667,7 +709,7 @@ function finishRace(stat = null)
     console.log( 'finishRace is completed');
 }
 
-// TVP может выдать нули в статистике, если пилоты не вылетили. Это нужно исправить.
+// TVP может выдать нули в статистике, если некоторые пилоты не вылетили. Это нужно исправить.
 // stat : array pilot, pos, lps, total
 function zeroCorrection(stat)
 {
@@ -682,6 +724,15 @@ function zeroCorrection(stat)
         }
     });
     return stat;
+}
+
+// TVP может не выдать результат, если все пилоты не вылетели
+function emptyCorrection( num) {
+    let res = [];
+    for( let i=0; i< num; i++){
+        res[i]={pos:i, lps:0, total:0};
+    }
+    return res;
 }
 
 /*
@@ -704,7 +755,6 @@ function findPilotInLoop(pilots, loop, place) {
     }
     console.error('ERROR findPilotInLoop: не найден L:',loop, 'P:', place  );
     return false;
-
 }
 
 function findPilotInGroup(group, loop, place) {
@@ -855,8 +905,15 @@ function startPrerace(){
 
     // отправить пилотов в TVP
     if( !global.settings.withoutTVP ) {
-        for (let i = 0; i < global.settings.groups[groupCur].length; i++) {
-            sendPilotName(i + 1, global.settings.groups[groupCur][i]['Name']);
+        for (let i = 0; i < 4; i++) {
+            if( i < global.settings.groups[groupCur].length) {
+                sendPilotName(i + 1, global.settings.groups[groupCur][i]['Name']);
+                onCamera(i+1);
+            }
+            else {
+                sendPilotName(i + 1, '');
+                offCamera(i+1)
+            }
         }
     }
 
@@ -955,6 +1012,15 @@ const sendOsc = function (addr, arg1) {
 const sendPilotName = function (camid, name) {
     sendOsc('/v1/camera/' + camid + '/label', name);
 };
+
+const onCamera = function (camid) {
+    sendOsc('/v1/camera/' + camid + '/display', 'on');
+};
+
+const offCamera = function (camid) {
+    sendOsc('/v1/camera/' + camid + '/display', 'off');
+};
+
 
 const sendStartCommand = function () {
     sendOsc('/v1/startrace', 1);
