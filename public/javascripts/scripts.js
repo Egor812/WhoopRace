@@ -1,4 +1,9 @@
-let clockElm;
+let clockElm = $('#prepare-timer');
+const elmPagination = $('#pagination');
+const elmRace = $('#race');
+const elmMenu = $('#menu');
+const elmResults = $('#results');
+const elmRerace = $('#rerace');
 
 function showMenu(settings, raceLoop, groupCur, rulesName) {
     setSettings(settings);
@@ -12,7 +17,7 @@ function showMenu(settings, raceLoop, groupCur, rulesName) {
         document.getElementById('race-progress').innerHTML = `Гонка завершена`;
         $('#resume-race').hide();
     }
-    $('#menu').show();
+    elmMenu.show();
 }
 
 /*
@@ -20,11 +25,11 @@ function showMenu(settings, raceLoop, groupCur, rulesName) {
  */
 function prerace(group=0, round = 0, showNext= 1) {
 
-    $('#race').show();
-    $('#menu').hide();
-    $('#results').hide();
-    $('#rerace').hide();
-    $('#pagination').show();
+    elmRace.show();
+    elmMenu.hide();
+    elmResults.hide();
+    elmRerace.hide();
+    elmPagination.show();
 
     let groups = settings.groups;
     //let prepareTimer = settings.prepareTimer;
@@ -34,13 +39,10 @@ function prerace(group=0, round = 0, showNext= 1) {
     let groupMax = groups.length; // max index+1
     let groupNext;
 
-    console.log(groups);
-
     const elmPilots = [];
     const elmPilotsNext=[];
     const htmlGroup = document.getElementById('group');
     const htmlRound = document.getElementById('round');
-    const elmPagination = $('#pagination');
 
     $('.group-pilots-results').hide();
 
@@ -138,17 +140,17 @@ function results(data, rules) {
         }
     }
     $('.group-pilots-results').css( "display", "block" );
-    $('#rerace').show();
-    $('#pagination').hide();
+    elmRerace.show();
+    elmPagination.hide();
     console.log(data);
 }
 
 // data[][ Results[laps pos time], Sums[pos ] ]
 function showResults(data, loop) {
     console.log(data);
-    $('#race').hide();
-    $('#menu').hide();
-    $('#results').show();
+    elmRace.hide();
+    elmMenu.hide();
+    elmResults.show();
 
     document.getElementById('result-round').innerHTML= `Раунд ${(loop)}/${settings.raceLoops}`;
 
@@ -250,10 +252,8 @@ function getSettingsFromForm(){
     let obsSceneTVP = $('#obsSceneTVP').val();
     let obsSceneWR = $('#obsSceneWR').val();
     let obsSceneBreak = $('#obsSceneBreak').val();
-    const args = {judges: judges, withoutTVP: withoutTVP, prepareTimer: prepareTimer, raceTimer : raceTimer, raceLoops: raceLoops, rules: rules,
+    return {judges: judges, withoutTVP: withoutTVP, prepareTimer: prepareTimer, raceTimer : raceTimer, raceLoops: raceLoops, rules: rules,
         obsUse:obsUse, obsPort:obsPort, obsSceneTVP:obsSceneTVP, obsSceneWR:obsSceneWR, obsSceneBreak:obsSceneBreak, obsPassword:obsPassword, raceLaps:raceLaps};
-    console.log(args);
-    return args;
 }
 
 /*
@@ -379,8 +379,8 @@ window.setup = window.setup || {}, // откуда я это взял? как э
 
             // остановить гонку (Х)
             exitRace: function(){
-                $('#race').hide();
-                $('#results').hide();
+                elmRace.hide();
+                elmResults.hide();
                 ipcRenderer.invoke('stop-race').then( () => {
                     ipcRenderer.invoke('get-progress').then( result  => {
                         $('menu-this-race').show();
@@ -407,13 +407,13 @@ window.setup = window.setup || {}, // откуда я это взял? как э
             changePage: function(elm){
                 //alert(elm.dataset.page);
                 ipcRenderer.send('start-prerace',{ group : Number(elm.dataset.page) });
-                $('#race').show();
+                elmRace.show();
             },
 
             rerace: function(){
-                let group = Number( $('#rerace').data('group') );
+                let group = Number( elmRerace.data('group') );
                 ipcRenderer.send('start-prerace',{ group : group });
-                $('#race').show();
+                elmRace.show();
             },
 
             // увеличить время на подготовку
@@ -435,7 +435,6 @@ window.setup = window.setup || {}, // откуда я это взял? как э
             validateResults: function(elm) {
                 let val = $(elm).val();
                 let id = elm.id;
-                console.log(id);
                 $(".group-pilots-place").each(function () {
                     if ($(this).val() === val && $(this).attr('id') !== id) {
                         $(this).css("color", "red");
@@ -480,10 +479,10 @@ window.setup = window.setup || {}, // откуда я это взял? как э
                 $('#export-xls').click( function () {
                     setup.handler.exportXLS();
                 });
-                $('#pagination').on('click', '.pagination-group', function () {
+                elmPagination.on('click', '.pagination-group', function () {
                     setup.handler.changePage(this);
                 });
-                $('#rerace').on('click', '#rerace', function () {
+                elmRerace.click( function () {
                     setup.handler.rerace();
                 });
                 addEventListener("keyup", function(event) {

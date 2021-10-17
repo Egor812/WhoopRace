@@ -69,23 +69,22 @@ const schema = {
 };
 
 
-// Если считаем места и место = 0 (не финишировал) - пишем max+1 место
-// TODO battle с 0 местом - врем я 0 - складываем и получаем маленькое среднее время - исправить
+
 const rules =[
     {},
     {
         id: 1,
-        name: 'training',
-        saveLaps: 0,
-        saveTime: 0,
-        savePlace: 0,
-        minPilots: 1,
-        maxPilots: 100,
+        name: 'Тренеровка',
+        saveLaps: 0,    // пишем статистику пройденных кругов
+        saveTime: 0,    // ...времени
+        savePlace: 0,   // ...занятого места
+        minPilots: 1,   // участников не меньше
+        maxPilots: 100, // участников не больше
         showNext: 1,    // показывать на экране приглашения готовящуюся группу
     },
     {
         id: 2,
-        name: 'qualification',
+        name: 'Квалификация',
         saveLaps: 1,
         saveTime: 1,
         savePlace: 0,
@@ -97,11 +96,11 @@ const rules =[
     {
         //https://www.multigp.com/wp-content/uploads/2019/04/multigp-double-elim-brackets1.png
         id: 4,
-        name: 'de8',
+        name: 'Double Elimination 8',
         saveLaps: 0,
         saveTime: 1,
         savePlace: 1,
-        minPilots: 6, /*todo*/
+        minPilots: 8,
         maxPilots: 8,
         loops: 6,
         groups: 1,
@@ -109,7 +108,7 @@ const rules =[
     },
     {
         id: 5,
-        name: 'battle4',
+        name: 'Турнир 4',
         saveLaps: 0,
         saveTime: 1,
         savePlace: 1,
@@ -152,9 +151,7 @@ const oscServer = new Server(4001, '127.0.0.1', () => {
 
 oscServer.on('message', function (msg) {
     console.log(`OSC RX: ${msg}` );
-
     if( inCompetition===1 && inRace===1 && !global.settings.withoutTVP && String(msg[0]) === '/racefinished' ) {
-
         //m.addStringArg( stat[i].pilot );
         //m.addIntArg( stat[i].pos );
         //m.addIntArg( stat[i].lps );
@@ -351,7 +348,7 @@ ipcMain.handle( 'parse-xls', async (event, arg)=> {
     const first_sheet_name = wb.SheetNames[0];
     const ws = wb.Sheets[first_sheet_name];
     const pilotsObj =  XLSX.utils.sheet_to_json(ws, {defval: false});
-    let pilots = parseXLS(pilotsObj);
+    let pilots = parseXLS(pilotsObj, global.settings.rules);
     global.settings.groups = preparePilotsGroups(pilots, global.settings.rules);
     global.settings.pilots = addJudges(pilots, global.settings.rules);
     store.set('pilots', global.settings.pilots);
@@ -383,7 +380,6 @@ ipcMain.handle( 'submit-race', async (event, arg)=> {
     global.settings.pilots.forEach( function ( item ) {
         item.Results = [];
     });
-
 
     raceLoop=0;
     groupCur=0;
@@ -464,11 +460,11 @@ ipcMain.on( 'pause-prerace',  ()=> {
 ipcMain.on( 'get-stat',  ()=> {
     if( global.settings.raceLoops && raceLoop>=global.settings.raceLoops) {
         //ИТОГОВЫЙ ИТОГ
-        showFinalResults();
+        showFinalResults( global.settings.pilots, global.settings.rules );
     }
     else{
         //промежуточный итог
-        showIntermediateResults();
+        showIntermediateResults( global.settings.pilots, global.settings.rules );
     }
 });
 
@@ -506,7 +502,7 @@ ipcMain.on( 'get-results',  ( event, arg )=> {
     // изучить - https://ru.stackoverflow.com/questions/412715/%D0%97%D0%B0%D0%BF%D1%83%D1%81%D0%BA-%D1%84%D1%83%D0%BD%D0%BA%D1%86%D0%B8%D0%B8-%D0%BF%D0%BE-%D0%B7%D0%BD%D0%B0%D1%87%D0%B5%D0%BD%D0%B8%D1%8E-%D0%BF%D0%B5%D1%80%D0%B5%D0%BC%D0%B5%D0%BD%D0%BD%D0%BE%D0%B9
 });
 
-function parseXLS(xlsjson)
+function parseXLS(xlsjson, rules  )
 {
     let loop =0;
     let curLoop;
@@ -518,7 +514,7 @@ function parseXLS(xlsjson)
         result[i] = {};
         result[i].Results = [];
         Object.keys(pilot).map(function(objectKey, index) {
-            if( objectKey === 'Num' )  { // Num должен быть от 0 и попорядку
+            if( objectKey === 'Num' )  { // Запишем Num от 0 и попорядку
                 result[i][objectKey] = i;
                 return;
             }
@@ -543,8 +539,8 @@ function parseXLS(xlsjson)
     });
 
 
-    if( rulesFunc[ global.settings.rules].fFindRace !== undefined ) {
-        let pos = rulesFunc[ global.settings.rules].fFindRace(result);
+    if( rulesFunc[ rules ].fFindRace !== undefined ) {
+        let pos = rulesFunc[ rules].fFindRace(result);
         raceLoop = pos.loop;
         groupCur = pos.group;
     }
@@ -563,11 +559,7 @@ function parseXLS(xlsjson)
             groupCur = 0;
         }
     }
-
-    //console.log( JSON.parse(JSON.stringify(obj)) );
     console.log(result, raceLoop, groupCur);
-    //console.log( result[0]);
-
     return result;
 }
 
@@ -575,7 +567,7 @@ function findRaceDE8(pilots)
 {
     let max = 0;
     let len;
-    pilots.forEach( function ( pilot, i ) {
+    pilots.forEach( function ( pilot ) {
         len = pilot.Results.length;
         if( len>max ) max = len;
     });
@@ -641,7 +633,6 @@ function initializeClock(id, counter, endFunc = function(){return 0}) {
         else {
             mainWindow.webContents.send('timer-value', 'II');
         }
-        //console.log(timerCur);
     }
     timerCur = counter;
     timeInterval = setInterval(updateClock, 1000);
@@ -673,11 +664,6 @@ function startRace() {
     console.log( 'startRace is completed');
 }
 
-/*function nextGroup(group, groupCount) {
-    let groupNext = group+1;
-    if( groupNext>=groupCount) groupNext=0;
-    return groupNext;
-}*/
 
 /*
 stat : array pilot, pos, lps, total
@@ -746,9 +732,9 @@ function saveRaceReq() {
 }
 
 function findPilotInLoop(pilots, loop, place) {
-    console.log('l', loop, 'p', place);
+    //console.log('l', loop, 'p', place);
     for (let i = 0; i < pilots.length; i++) {
-        console.log(pilots[i].Results);
+        //console.log(pilots[i].Results);
         if( pilots[i].Results[loop] !== undefined) {
             if (pilots[i].Results[loop].pos === place) return i;
         }
@@ -847,8 +833,6 @@ function setJudgesDE8(pilots) {
 
 
 function nextRace() {
-    //if( rulesFunc[ global.settings.rules ].fRaceResults !== undefined) rulesFunc[ global.settings.rules ].fRaceResults(groupCur);
-
     // переключить группу
     groupCur++;
 
@@ -861,7 +845,7 @@ function nextRace() {
         store.set('raceLoop', raceLoop);
         if( global.settings.raceLoops && raceLoop>=global.settings.raceLoops) {
             //ИТОГОВЫЙ ИТОГ
-            showFinalResults();
+            showFinalResults( global.settings.pilots, global.settings.rules );
         }
         else{
             //промежуточный итог
@@ -870,7 +854,7 @@ function nextRace() {
             }
             else {
                 initializeClock('prepare-timer', 5, startPrerace);
-                showIntermediateResults();
+                showIntermediateResults( global.settings.pilots, global.settings.rules );
             }
         }
     }
@@ -883,14 +867,14 @@ function nextRace() {
 }
 
 
-function showIntermediateResults() {
-    let res = prepareResultsForRender(global.settings.pilots);
+function showIntermediateResults( pilots, rules ) {
+    let res = prepareResultsForRender( pilots, rules );
     mainWindow.webContents.send('show-results', { results : res, round : raceLoop });
 }
 
 
-function showFinalResults() {
-    let res = prepareResultsForRender(global.settings.pilots, 1);
+function showFinalResults( pilots, rules ) {
+    let res = prepareResultsForRender(pilots, rules, 1);
     mainWindow.webContents.send('show-results', { results : res, round : raceLoop });
 }
 
@@ -980,7 +964,6 @@ function preparePilotsGroups(pilotsObj, rulesNum) {
 function addJudges(pilotsObj, rulesNum) {
     if (rulesFunc[rulesNum].fJudges !== undefined) return rulesFunc[rulesNum].fJudges(pilotsObj);
     else {
-        /*todo судьи на 7 человек???*/
         for (let i = 0; i < pilotsObj.length; i++) {
             if (i < 4) {
                 if (pilotsObj[i + pilotsObj.length - 4]['Name'] !== undefined)
@@ -1185,7 +1168,7 @@ function filenameDate() {
     return yy + '-' + mm + '-' + dd + '--' + hh + '-' + min + '-' + ss;
 }
 
-function prepareResultsForRender(pilots, final =0) {
+function prepareResultsForRender(pilots, rules, final =0) {
     let ret = [];
     //console.log( pilots);
     pilots.forEach( function(pilot, i) {
@@ -1193,13 +1176,12 @@ function prepareResultsForRender(pilots, final =0) {
         ret[i].Name = pilot.Name;
         ret[i].Results = [];
         if( final ) ret[i].Sums = { pos:0, laps:0, time:0 };
-        //for(let j = 0; j < pilot.Results.length; j++){
         for(let j = 0; j < raceLoop; j++){
             ret[i].Results[j] = { pos:false, laps:false, time:false };
             if( pilot.Results[j] !== undefined && pilot.Results[j] !== null ) {
-                if (rules[global.settings.rules].savePlace) ret[i].Results[j].pos = pilot.Results[j].pos;
-                if (rules[global.settings.rules].saveTime) ret[i].Results[j].time = pilot.Results[j].time;
-                if (rules[global.settings.rules].saveLaps) ret[i].Results[j].laps = pilot.Results[j].laps;
+                if (rules[rules].savePlace) ret[i].Results[j].pos = pilot.Results[j].pos;
+                if (rules[rules].saveTime) ret[i].Results[j].time = pilot.Results[j].time;
+                if (rules[rules].saveLaps) ret[i].Results[j].laps = pilot.Results[j].laps;
                 if( final ){
                     ret[i].Sums.pos += pilot.Results[j].pos;
                     ret[i].Sums.time += pilot.Results[j].time;
@@ -1210,8 +1192,8 @@ function prepareResultsForRender(pilots, final =0) {
     });
 
     if( final ) {
-        if( rulesFunc[global.settings.rules] !== undefined){
-            ret = rulesFunc[global.settings.rules].fFinalPos(ret);
+        if( rulesFunc[rules] !== undefined){
+            ret = rulesFunc[rules].fFinalPos(ret);
         }
     }
     console.log( 'prepareResultsForRender:', ret );
