@@ -806,16 +806,31 @@ function seedDE8group(pilots, race){
 
 function seedDE8groupsOnLoad( pilots ) {
     let group = [];
-    group[0]=[];
-    group[1]=[];
-    group[0][0] = pilots[1];
-    group[0][1] = pilots[2];
-    group[0][2] = pilots[4];
-    group[0][3] = pilots[6];
-    group[1][0] = pilots[0];
-    group[1][1] = pilots[3];
-    group[1][2] = pilots[5];
-    group[1][3] = pilots[7];
+    if( pilots.length>=8) {
+        group[0] = [];
+        group[1] = [];
+        group[0][0] = pilots[1];
+        group[0][1] = pilots[2];
+        group[0][2] = pilots[4];
+        group[0][3] = pilots[6];
+        group[1][0] = pilots[0];
+        group[1][1] = pilots[3];
+        group[1][2] = pilots[5];
+        group[1][3] = pilots[7];
+    }
+    else{ // не валидно
+        group[0]=[];
+        for (let i = 0; i < pilots.length; i++ ) {
+            group[1].push(pilots[i]);
+        }
+    }
+
+    if( pilots.length>8) { // не валидно
+        group[2]=[];
+        for (let i = 8; i < pilots.length; i++ ) {
+            group[2].push(pilots[i]);
+        }
+    }
     return group;
 }
 

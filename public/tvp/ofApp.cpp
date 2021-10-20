@@ -412,7 +412,7 @@ void setupMain() {
     // debug
     if (DEBUG_ENABLED == true) {
         generateDummyData();
-        tvpStat stat[cameraNum];
+        tvpStat stat[CAMERA_MAXNUM];
         fwriteRaceResult(stat);
     }
 }
@@ -2677,7 +2677,7 @@ void stopRace(bool appexit) {
         raceResultTimer = ARAP_RSLT_DELAY;
     }
 
-    tvpStat stat[cameraNum];
+    tvpStat stat[CAMERA_MAXNUM];
     haveStat = fwriteRaceResult(stat);
 
     // osc
