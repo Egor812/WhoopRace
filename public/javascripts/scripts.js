@@ -1,9 +1,12 @@
-let clockElm = $('#prepare-timer');
+const clockPrepareElm = $('#prepare-timer');
+const clockRaceElm = $('#race-timer');
+let clockElm = clockRaceElm;
 const elmPagination = $('#pagination');
 const elmRace = $('#race');
 const elmMenu = $('#menu');
 const elmResults = $('#results');
 const elmRerace = $('#rerace');
+const elmStartNow = $('#start-now');
 
 function showMenu(settings, raceLoop, groupCur, rulesName) {
     setSettings(settings);
@@ -23,13 +26,14 @@ function showMenu(settings, raceLoop, groupCur, rulesName) {
 /*
 Страница приглашения пилотов
  */
-function prerace(group=0, round = 0, showNext= 1) {
+function prerace(group=0, round = 0, showNext= 1, wawGroup = 1) {
 
     elmRace.show();
     elmMenu.hide();
     elmResults.hide();
     elmRerace.hide();
     elmPagination.show();
+    elmStartNow.show();
 
     let groups = settings.groups;
     //let prepareTimer = settings.prepareTimer;
@@ -91,32 +95,47 @@ function prerace(group=0, round = 0, showNext= 1) {
 
     $("#rerace").data('group', groupThis );
 
-    let audio = document.getElementById('wav-invite');
-    audio.addEventListener('ended', () => {
-        setTimeout(() => {  document.getElementById('wav-' + (groupThis + 1)).play(); }, 250);
-    }, { once: true });
-    audio.play();
+    if( wawGroup ){
+        let audio = document.getElementById('wav-invite');
+        audio.addEventListener('ended', () => {
+            setTimeout(() => {  document.getElementById('wav-' + (groupThis + 1)).play(); }, 250);
+        }, { once: true });
+        audio.play();
+    }
+    else{
+        let audio = document.getElementById('wav-invitenext');
+        audio.play();
+    }
 
 }
 
-function switchToRaceTimer() {
-    $('#prepare-timer').hide();
-    clockElm = $('#race-timer');
+function switchToRaceTimer()
+{
+    clockPrepareElm.hide();
+    clockElm = clockRaceElm;
     clockElm.text(settings.raceTimer);
     clockElm.show();
 }
 
-function switchToPreraceTimer() {
-    $('#race-timer').hide();
-    clockElm = $('#prepare-timer');
+function switchToPreraceTimer()
+{
+    clockRaceElm.hide();
+    clockElm = clockPrepareElm;
     if( settings.prepareTimer===0 ) clockElm.text('');
     else clockElm.text(settings.prepareTimer);
     clockElm.show();
 }
 
-function race() {
+function race(rules)
+{
+    elmStartNow.hide();
     switchToRaceTimer();
     if( settings.withoutTVP ) {
+        for( let i=0; i<4; i++) {
+            if (!rules.savePlace) $('#gpp-' + (i + 1)).hide();
+            if (!rules.saveLaps) $('#gpl-' + (i + 1)).hide();
+            if (!rules.saveTime) $('#gpt-' + (i + 1)).hide();
+        }
         $('.group-pilots-results').show();
         document.getElementById('wav-counter').play();
     }
@@ -126,7 +145,8 @@ function race() {
 Результаты после вылета
 data[][ pilot, pos, lps, total ]
  */
-function results(data, rules) {
+function results(data, rules)
+{
     switchToPreraceTimer();
     console.log( 'rules:'+rules);
     for( let i=0; i<4; i++){
@@ -290,12 +310,12 @@ ipcRenderer.on('editresults', (event, arg)=> {
 });
 
 
-ipcRenderer.on('show-race', ()=> {
-    race();
+ipcRenderer.on('show-race', (event, arg)=> {
+    race( arg['rules'] );
 });
 
 ipcRenderer.on('show-prerace', (event, arg)=> {
-    prerace(arg['group'], arg['round'], arg['showNext']);
+    prerace(arg['group'], arg['round'], arg['showNext'], arg['wavGroup']);
 });
 
 ipcRenderer.on('open-dialog-paths-selected', (event, arg)=> {
@@ -416,6 +436,10 @@ window.setup = window.setup || {}, // откуда я это взял? как э
                 elmRace.show();
             },
 
+            startNow: function(){
+                ipcRenderer.send('start-race');
+            },
+
             // увеличить время на подготовку
             addPreRaceTime: function() {
                 ipcRenderer.send('add-prerace-time');
@@ -485,14 +509,18 @@ window.setup = window.setup || {}, // откуда я это взял? как э
                 elmRerace.click( function () {
                     setup.handler.rerace();
                 });
+                elmStartNow.click( function () {
+                    setup.handler.startNow();
+                });
+
                 addEventListener("keyup", function(event) {
                     if (event.code === 'KeyQ') {
-                        if ($('#prepare-timer').is(":visible")) {
+                        if (clockPrepareElm.is(":visible")) {
                             setup.handler.addPreRaceTime();
                         }
                     }
                     else if (event.code === 'Space') {
-                        if ($('#prepare-timer').is(":visible")) {
+                        if (clockPrepareElm.is(":visible")) {
                             setup.handler.pausePreRace();
                         }
                     }

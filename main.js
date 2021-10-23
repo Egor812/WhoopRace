@@ -81,6 +81,7 @@ const rules =[
         minPilots: 1,   // участников не меньше
         maxPilots: 100, // участников не больше
         showNext: 1,    // показывать на экране приглашения готовящуюся группу
+        wavNextNum: 1   // 1 - вызывается группа {номер}, 0 - вызывается следующая группа
     },
     {
         id: 2,
@@ -90,7 +91,8 @@ const rules =[
         savePlace: 0,
         minPilots: 1,
         maxPilots: 100,
-        showNext: 1
+        showNext: 1,
+        wavNextNum: 1
     },
     {},
     {
@@ -104,7 +106,8 @@ const rules =[
         maxPilots: 8,
         loops: 6,
         groups: 1,
-        showNext: 0
+        showNext: 0,
+        wavNextNum: 0
     },
     {
         id: 5,
@@ -114,7 +117,8 @@ const rules =[
         savePlace: 1,
         minPilots: 1,
         maxPilots: 4,
-        showNext: 1
+        showNext: 1,
+        wavNextNum: 0
     },
 
 ];
@@ -439,6 +443,10 @@ ipcMain.on( 'start-prerace', (event, arg)=> {
     startPrerace();
 });
 
+ipcMain.on( 'start-race', ()=>{
+    startRace();
+});
+
 ipcMain.handle( 'stop-race', async ()=> {
     inCompetition=0;
     clearInterval(timeInterval);
@@ -634,6 +642,7 @@ function initializeClock(id, counter, endFunc = function(){return 0}) {
             mainWindow.webContents.send('timer-value', 'II');
         }
     }
+    clearInterval(timeInterval);
     timerCur = counter;
     timeInterval = setInterval(updateClock, 1000);
 }
@@ -642,12 +651,14 @@ function initializeClock(id, counter, endFunc = function(){return 0}) {
  старт гонки
  */
 function startRace() {
+    clearInterval(timeInterval); // не убирать из-за delay ниже
+    pause = 0;
     console.log( 'Start G'+(groupCur+1)+'/'+global.settings.groups.length+' L'+(raceLoop+1)+'/'+global.settings.raceLoops);
 
     if( global.settings.obsUse && !global.settings.withoutTVP ) {
         changeSceneObs( global.settings.obsSceneTVP);
     }
-    mainWindow.webContents.send('show-race');
+    mainWindow.webContents.send('show-race', {rules : rules[global.settings.rules]} );
     if( !global.settings.withoutTVP){
         sendStartCommand();
     }
@@ -680,7 +691,7 @@ function finishRace(stat = null)
     if( rules[global.settings.rules].savePlace+rules[global.settings.rules].saveTime+rules[global.settings.rules].saveLaps!==0 ){
         console.log( 'finishRace: ', stat );
         console.log( 'finishRace: ', rules[global.settings.rules] );
-        if( stat.length === 0) stat = emptyCorrection( global.settings.groups[groupCur].length );
+        if( stat === null || stat.length === 0) stat = emptyCorrection( global.settings.groups[groupCur].length );
         else stat=zeroCorrection(stat);
         console.log( 'correction:', stat);
         mainWindow.webContents.send('editresults', { stat : stat, rules : rules[global.settings.rules] });
@@ -894,13 +905,14 @@ function showFinalResults( pilots, rules ) {
 }
 
 function startPrerace(){
-    mainWindow.webContents.send('show-prerace', { group : groupCur, round : raceLoop, showNext : rules[ global.settings.rules ].showNext });
+    pause = 0;
+    //clearInterval(timeInterval);
+    mainWindow.webContents.send('show-prerace', { group : groupCur, round : raceLoop, showNext : rules[ global.settings.rules ].showNext, wavGroup : rules[ global.settings.rules ].wavNextNum });
 
     if( global.settings.obsUse ) {
         changeSceneObs( global.settings.obsSceneWR);
     }
     console.log( 'Invitation G'+(groupCur+1)+'/'+global.settings.groups.length+' L'+(raceLoop+1)+'/'+global.settings.raceLoops);
-    clearInterval(timeInterval);
 
     // отправить пилотов в TVP
     if( !global.settings.withoutTVP ) {

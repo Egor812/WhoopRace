@@ -1321,11 +1321,11 @@ void keyPressedOverlayNone(int key) {
             toggleCameraVisibility(3);
         } else if (key == '4') {
             toggleCameraVisibility(4);
-        } else if (key == '5' || key == 'z' || key == 'Z') {
+        } else if (key == '5') {
             popLapRecord(1);
         } else if (key == '6') {
             popLapRecord(2);
-        } else if (key == '7' || key == '/' || key == '?') {
+        } else if (key == '7') {
             popLapRecord(3);
         } else if (key == '8') {
             popLapRecord(4);
@@ -1339,14 +1339,22 @@ void keyPressedOverlayNone(int key) {
             toggleCameraSolo(3);
         } else if (key == '4') {
             toggleCameraSolo(4);
-        } else if (key == '5' || key == 'z' || key == 'Z') {
+        } else if (key == '5' || key == OF_KEY_F1) {
             pushLapRecord(1, ofGetElapsedTimef());
-        } else if (key == '6') {
+        } else if (key == '6' || key == OF_KEY_F2) {
             pushLapRecord(2, ofGetElapsedTimef());
-        } else if (key == '7' || key == '/' || key == '?') {
+        } else if (key == '7' || key == OF_KEY_F3) {
             pushLapRecord(3, ofGetElapsedTimef());
-        } else if (key == '8') {
+        } else if (key == '8' || key == OF_KEY_F4) {
             pushLapRecord(4, ofGetElapsedTimef());
+        } else if ( key == OF_KEY_F5) {
+            popLapRecord(1);
+        } else if ( key == OF_KEY_F6) {
+            popLapRecord(2);
+        } else if ( key == OF_KEY_F7) {
+            popLapRecord(3);
+        } else if ( key == OF_KEY_F8) {
+            popLapRecord(4);
         } else if (key == 'h' || key == 'H') {
             setOverlayMode(OVLMODE_HELP);
         } else if (key == 'i' || key == 'I') {
@@ -1361,6 +1369,8 @@ void keyPressedOverlayNone(int key) {
             }
         } else if (key == ' ') {
             toggleRace();
+        } else if (key == OF_KEY_F12) {
+            reRace();
         } else if (key == 'r' || key == 'R') {
             if (raceStarted == false) {
                 qrEnabled = false;
@@ -2622,6 +2632,16 @@ void toggleRace() {
     }
 }
 
+
+//--------------------------------------------------------------
+void reRace() {
+    if (raceStarted != false) {
+        stopRace(false, false);
+        startRace();
+    }
+}
+
+
 //--------------------------------------------------------------
 void initRaceVars() {
     for (int i = 0; i < cameraNum; i++) {
@@ -2663,7 +2683,7 @@ void startRace() {
 }
 
 //--------------------------------------------------------------
-void stopRace(bool appexit) {
+void stopRace(bool appexit, bool osc) {
     bool haveStat;
     if (raceStarted == false) {
         return;
@@ -2681,17 +2701,19 @@ void stopRace(bool appexit) {
     haveStat = fwriteRaceResult(stat);
 
     // osc
-	ofxOscMessage m;
-	m.setAddress("/racefinished");
-    if( haveStat) {
-        for (int i = 0; i < cameraNum; i++) {
-            m.addStringArg( stat[i].pilot );
-            m.addIntArg( stat[i].pos );
-            m.addIntArg( stat[i].lps );
-            m.addFloatArg( stat[i].total );
+    if( osc ){
+        ofxOscMessage m;
+        m.setAddress("/racefinished");
+        if( haveStat) {
+            for (int i = 0; i < cameraNum; i++) {
+                m.addStringArg( stat[i].pilot );
+                m.addIntArg( stat[i].pos );
+                m.addIntArg( stat[i].lps );
+                m.addFloatArg( stat[i].total );
+            }
         }
-    }
-	oscSender.sendMessage(m, false);
+        oscSender.sendMessage(m, false);
+	}
 
 }
 
@@ -3655,17 +3677,17 @@ void drawHelpBody(int line) {
     ofSetColor(myColorDGray);
     drawULineBlock(blk1, blk4, line + 1, szb, szl);
     ofSetColor(myColorWhite);
-    drawStringBlock(&myFontOvlayP, xmlLang.getValue("lang:addlap","Add Lap at Camera 1~4,1,3"), blk1, line, ALIGN_LEFT, szb, szl);
+    drawStringBlock(&myFontOvlayP, xmlLang.getValue("lang:addlap","Add Lap at Camera 1~4"), blk1, line, ALIGN_LEFT, szb, szl);
     drawStringBlock(&myFontOvlayP, "-", blk2, line, ALIGN_CENTER, szb, szl);
-    drawStringBlock(&myFontOvlayP, "5~8,Z,/", blk3, line, ALIGN_CENTER, szb, szl);
+    drawStringBlock(&myFontOvlayP, "5~8, F1~F4", blk3, line, ALIGN_CENTER, szb, szl);
     line++;
     // Delete previous lap at camera 1~4
     ofSetColor(myColorDGray);
     drawULineBlock(blk1, blk4, line + 1, szb, szl);
     ofSetColor(myColorWhite);
-    drawStringBlock(&myFontOvlayP, xmlLang.getValue("lang:dellap","Delete Previous Lap at Camera 1~4,1,3"), blk1, line, ALIGN_LEFT, szb, szl);
+    drawStringBlock(&myFontOvlayP, xmlLang.getValue("lang:dellap","Delete Previous Lap at Camera 1~4"), blk1, line, ALIGN_LEFT, szb, szl);
     drawStringBlock(&myFontOvlayP, "-", blk2, line, ALIGN_CENTER, szb, szl);
-    drawStringBlock(&myFontOvlayP, ofToString(TVP_STR_ALT) + " + 5~8,Z,/", blk3, line, ALIGN_CENTER, szb, szl);
+    drawStringBlock(&myFontOvlayP, ofToString(TVP_STR_ALT) + " + 5~8, F5~F8", blk3, line, ALIGN_CENTER, szb, szl);
     line++;
     // Display race result
     ofSetColor(myColorDGray);
@@ -3682,6 +3704,14 @@ void drawHelpBody(int line) {
     drawStringBlock(&myFontOvlayP, xmlLang.getValue("lang:clrraceres","Clear Race Result"), blk1, line, ALIGN_LEFT, szb, szl);
     drawStringBlock(&myFontOvlayP, "-", blk2, line, ALIGN_CENTER, szb, szl);
     drawStringBlock(&myFontOvlayP, "C", blk3, line, ALIGN_CENTER, szb, szl);
+    line++;
+    // Restart Race
+    ofSetColor(myColorDGray);
+    drawULineBlock(blk1, blk4, line + 1, szb, szl);
+    ofSetColor(myColorWhite);
+    drawStringBlock(&myFontOvlayP, xmlLang.getValue("lang:rerace","Restart race"), blk1, line, ALIGN_LEFT, szb, szl);
+    drawStringBlock(&myFontOvlayP, "-", blk2, line, ALIGN_CENTER, szb, szl);
+    drawStringBlock(&myFontOvlayP, "F12", blk3, line, ALIGN_CENTER, szb, szl);
     line++;
 }
 

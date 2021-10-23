@@ -372,9 +372,10 @@ void keyPressedOverlayNone(int);
 void mouseReleasedOverlayNone(int, int, int);
 // race
 void toggleRace();
+void reRace();
 void initRaceVars();
 void startRace();
-void stopRace(bool);
+void stopRace(bool appexit, bool osc = true);
 bool isVariousPilots(int);
 bool isVariousPilotsAll();
 bool isRecordedLaps();
