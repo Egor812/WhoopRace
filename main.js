@@ -52,7 +52,7 @@ const schema = {
         type: 'number',
         maximum: 1000,
         minimum: 0,
-        default: 0
+        default: 10
     },
     obsUse: {
         type: 'number',
@@ -220,6 +220,8 @@ main.on('ready', function() {
             enableRemoteModule: true  // вкл .remote
         },
     });
+
+    mainWindow.setMenu(null);
 
     // и загружаем файл index.html нашего веб приложения.
     mainWindow.loadFile('./public/index.html').then();
@@ -394,7 +396,8 @@ ipcMain.handle( 'submit-race', async (event, arg)=> {
     pause=0;
     if( !arg['withoutTVP']){
         sendRaceDuration(global.settings.raceTimer);
-        sendRaceLaps(global.settings.raceLaps);
+        if( rules[ global.settings.rules ].saveLaps === 0 ) sendRaceLaps(100);
+        else sendRaceLaps(global.settings.raceLaps);
     }
     if( arg['obsUse'] ){
         connectObs(arg['obsPort'], arg['obsPassword']);
@@ -412,7 +415,8 @@ ipcMain.handle( 'resume-race', async ()=> {
     pause=0;
     if( !global.settings.withoutTVP ){
         sendRaceDuration(global.settings.raceTimer);
-        sendRaceLaps(global.settings.raceLaps);
+        if( rules[ global.settings.rules ].saveLaps === 0 ) sendRaceLaps(100);
+        else sendRaceLaps(global.settings.raceLaps);
     }
     if( global.settings.obsUse ){
         connectObs( global.settings.obsPort, global.settings.obsPassword);
@@ -727,7 +731,7 @@ function zeroCorrection(stat)
 function emptyCorrection( num) {
     let res = [];
     for( let i=0; i< num; i++){
-        res[i]={pos:i, lps:0, total:0};
+        res[i]={pos:i+1, lps:0, total:0};
     }
     return res;
 }
@@ -866,12 +870,19 @@ function nextRace() {
     if( (rules[global.settings.rules].groups !== undefined && groupCur>=rules[global.settings.rules].groups) || groupCur>=global.settings.groups.length) {
         groupCur=0;
         raceLoop++;
-        if( rulesFunc[ global.settings.rules ].fRaceNext !== undefined)  global.settings.groups[0] = rulesFunc[ global.settings.rules ].fRaceNext(global.settings.pilots, raceLoop);
+        if( rulesFunc[ global.settings.rules ].fRaceNext !== undefined)  {
+            global.settings.groups[0] = rulesFunc[ global.settings.rules ].fRaceNext(global.settings.pilots, raceLoop);
+        }
         store.set('groupCur', groupCur);
         store.set('raceLoop', raceLoop);
         if( global.settings.raceLoops && raceLoop>=global.settings.raceLoops) {
             //ИТОГОВЫЙ ИТОГ
-            showFinalResults( global.settings.pilots, global.settings.rules );
+            if( rules[global.settings.rules].savePlace+rules[global.settings.rules].saveTime+rules[global.settings.rules].saveLaps>0 ) {
+                showFinalResults(global.settings.pilots, global.settings.rules);
+            }
+            else{
+                mainWindow.webContents.send('show-results', { results : false, round : raceLoop });
+            }
         }
         else{
             //промежуточный итог
@@ -1041,6 +1052,7 @@ const sendRaceDuration = function (sec) {
 };
 
 const sendRaceLaps = function (num) {
+    if( num === 0 ) num=100; // если 0 - гонка в tvp финиширует мгновенно
     sendOsc('/v1/setduralaps', num);
 };
 
@@ -1195,7 +1207,7 @@ function filenameDate() {
     return yy + '-' + mm + '-' + dd + '--' + hh + '-' + min + '-' + ss;
 }
 
-function prepareResultsForRender(pilots, rules, final =0) {
+function prepareResultsForRender(pilots, rules_num, final =0) {
     let ret = [];
     //console.log( pilots);
     pilots.forEach( function(pilot, i) {
@@ -1206,9 +1218,9 @@ function prepareResultsForRender(pilots, rules, final =0) {
         for(let j = 0; j < raceLoop; j++){
             ret[i].Results[j] = { pos:false, laps:false, time:false };
             if( pilot.Results[j] !== undefined && pilot.Results[j] !== null ) {
-                if (rules[rules].savePlace) ret[i].Results[j].pos = pilot.Results[j].pos;
-                if (rules[rules].saveTime) ret[i].Results[j].time = pilot.Results[j].time;
-                if (rules[rules].saveLaps) ret[i].Results[j].laps = pilot.Results[j].laps;
+                if (rules[rules_num].savePlace) ret[i].Results[j].pos = pilot.Results[j].pos;
+                if (rules[rules_num].saveTime) ret[i].Results[j].time = pilot.Results[j].time;
+                if (rules[rules_num].saveLaps) ret[i].Results[j].laps = pilot.Results[j].laps;
                 if( final ){
                     ret[i].Sums.pos += pilot.Results[j].pos;
                     ret[i].Sums.time += pilot.Results[j].time;
@@ -1219,8 +1231,8 @@ function prepareResultsForRender(pilots, rules, final =0) {
     });
 
     if( final ) {
-        if( rulesFunc[rules] !== undefined){
-            ret = rulesFunc[rules].fFinalPos(ret);
+        if( rulesFunc[rules_num] !== undefined && rulesFunc[rules_num].fFinalPos !== undefined ){
+            ret = rulesFunc[rules_num].fFinalPos(ret);
         }
     }
     console.log( 'prepareResultsForRender:', ret );
@@ -1280,7 +1292,7 @@ function posDE8( ret ) {
     // 2 - p3 -> 7, p4 -> 8,
     // 4 - p3 -> 5, p4 -> 6
     // 5 - p1..4
-    ret[findPilotInLoop(ret, 2,  4)].Sums.pos=8;
+    ret[findPilotInLoop(ret, 2, 4)].Sums.pos=8;
     ret[findPilotInLoop(ret, 2, 3)].Sums.pos=7;
     ret[findPilotInLoop(ret, 4, 4)].Sums.pos=6;
     ret[findPilotInLoop(ret, 4, 3)].Sums.pos=5;

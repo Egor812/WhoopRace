@@ -32,7 +32,8 @@ function prerace(group=0, round = 0, showNext= 1, wawGroup = 1) {
     elmMenu.hide();
     elmResults.hide();
     elmRerace.hide();
-    elmPagination.show();
+    if( showNext ) elmPagination.show();
+    else elmPagination.hide();
     elmStartNow.show();
 
     let groups = settings.groups;
@@ -171,6 +172,11 @@ function showResults(data, loop) {
     elmRace.hide();
     elmMenu.hide();
     elmResults.show();
+
+    if( data === false) {
+        document.getElementById('result-round').innerHTML= 'Гонка завершена';
+        return;
+    }
 
     document.getElementById('result-round').innerHTML= `Раунд ${(loop)}/${settings.raceLoops}`;
 
