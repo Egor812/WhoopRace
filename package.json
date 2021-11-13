@@ -1,15 +1,16 @@
 {
   "name": "whooprace.app",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "main": "main.js",
   "devDependencies": {
-    "electron": "^10.4.7"
+    "electron": "^15.3.1"
   },
   "scripts": {
     "start": "APP_DEV=true electron .",
     "make-win": "electron-packager . --platform=win32 --arch=x64 --prune=true --out=release-builds"
   },
   "dependencies": {
+    "@electron/remote": "^2.0.1",
     "@types/node-osc": "^6.0.0",
     "bootstrap": "^4.6.0",
     "electron-store": "^6.0.1",

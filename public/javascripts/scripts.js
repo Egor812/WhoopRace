@@ -301,7 +301,9 @@ function getResultsFromForm() {
 // IPC
 
 const { ipcRenderer } = require('electron');
-const settings = require('electron').remote.getGlobal( "settings" );
+//const settings = require('electron').remote.getGlobal( "settings" );
+//const { BrowserWindow } = require('@electron/remote');
+const settings = require('@electron/remote').getGlobal( "settings" );
 
 ipcRenderer.on('timer-value', (event, arg)=> {
     clockElm.text(arg);
@@ -379,15 +381,12 @@ window.setup = window.setup || {}, // откуда я это взял? как э
             obsCheckConnection: function()
             {
                 ipcRenderer.invoke('obsCheckConnection', { port: Number($('#obsPort').val()), pass:$('#obsPassword').val() } )
-                    .then( result => { if ( result===1 ) alert('OK'); else alert('Error');});
+                    .then( result => { /*if ( result===1 ) alert('OK'); else alert('Error');*/});
             },
 
             saveSettings: function(){
               const args = getSettingsFromForm();
-                ipcRenderer.invoke('save-settings', args).then( () => {
-                    alert('Сохранено')
-                });
-
+                ipcRenderer.invoke('save-settings', args).then();
             },
 
             // Новая гонка
@@ -399,7 +398,6 @@ window.setup = window.setup || {}, // откуда я это взял? как э
                     if( result===1 ) {
                         ipcRenderer.send('start-prerace', {group: 0});
                     }
-                    else alert(result);
                 });
             },
 
@@ -426,12 +424,10 @@ window.setup = window.setup || {}, // откуда я это взял? как э
                     if( result===1 ) {
                         ipcRenderer.send('start-prerace', {group: false});
                     }
-                    else alert(result);
                 });
             },
 
             changePage: function(elm){
-                //alert(elm.dataset.page);
                 ipcRenderer.send('start-prerace',{ group : Number(elm.dataset.page) });
                 elmRace.show();
             },

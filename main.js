@@ -15,6 +15,8 @@ const electron = require('electron');
 const main = electron.app;  // Модуль контролирующей жизненный цикл нашего приложения.
 const BrowserWindow = electron.BrowserWindow;  // Модуль создающий браузерное окно.
 
+require('@electron/remote/main').initialize();
+
 // Настройки
 const Store = require('electron-store'); // https://www.npmjs.com/package/electron-store
 const schema = {
@@ -144,10 +146,10 @@ loadSettings();
 
 // Общение с TVP
 //https://github.com/MylesBorins/node-osc
-//const { Client, Server } = require('node-osc');
 // Нам нужна 6 версия. В пятой криво принималась кирилица.
 // Еще она использует osc-min, который использует new Buffer. И это приводит к  DeprecationWarning: Buffer() is deprecated due to security and usability issues. Please use the Buffer.alloc(), Buffer.allocUnsafe(), or Buffer.from() methods instead.
-const { Client, Server } = require('node-osc/dist/lib/index.js'); // В package.json 6 версии node-osc не указан "main": "./dist/lib/index.js", - приходится так
+//const { Client, Server } = require('node-osc/dist/lib/index.js'); // В package.json 6 версии node-osc не указан "main": "./dist/lib/index.js", - в electron 10 приходится так
+const { Client, Server } = require('node-osc'); // в электрон 15 работает так
 const client = new Client('127.0.0.1', 4000);
 const oscServer = new Server(4001, '127.0.0.1', () => {
     console.log('OSC Server is listening');
@@ -217,9 +219,12 @@ main.on('ready', function() {
         backgroundColor: '0',
         webPreferences: {
             nodeIntegration: true,
-            enableRemoteModule: true  // вкл .remote
+            enableRemoteModule: true,  // вкл .remote
+            contextIsolation: false
         },
     });
+    require("@electron/remote/main").enable(mainWindow.webContents);
+
 
     mainWindow.setMenu(null);
 
@@ -337,10 +342,17 @@ ipcMain.handle( 'obsCheckConnection', async (event, arg)=> {
             password: arg['pass']
     }).then(() => {
         obs.disconnect();
+        const { dialog } = require('electron');
+        dialog.showMessageBoxSync({ 'message': 'Подключено', 'type':'info'});
         return 1;
     }).catch((error) => {
         console.error(error);
+        //{dialog} = require('electron').remote;
+        //dialog.showErrorBox('title here','type error message here');
+        const { dialog } = require('electron');
+        dialog.showErrorBox('Ошибка', 'Нет подключения');
         return 0;
+
     });
     //client.send( '/v1/camera/1/label','param');
     console.log( 'OBS connection: '+res);
@@ -372,14 +384,20 @@ ipcMain.handle( 'repackGroups', async (event, arg) =>{
 Событие - запуск гонок
  */
 ipcMain.handle( 'submit-race', async (event, arg)=> {
+    const { dialog } = require('electron');
+
     // если в правилах записаны loops - это приоритетней данных из формы
     if( rules[ global.settings.rules ].loops !== undefined ) arg.raceLoops = rules[ global.settings.rules ].loops;
     setSettings(arg);
-    if( global.settings.groups.length===0) return 'Загрузите пилотов';
+    if( global.settings.groups.length===0) {
+        dialog.showErrorBox('Ошибка', 'Загрузите пилотов');
+        return 0;
+    }
 
-    if( global.settings.pilots.length<rules[global.settings.rules].minPilots ||
-        global.settings.pilots.length>rules[global.settings.rules].maxPilots )
-        return 'Количество пилотов не соответствует выбранным правилам';
+    if( global.settings.pilots.length<rules[global.settings.rules].minPilots || global.settings.pilots.length>rules[global.settings.rules].maxPilots ) {
+        dialog.showErrorBox('Ошибка', 'Количество пилотов не соответствует выбранным правилам');
+        return 0;
+    }
 
     saveSettings(arg);
 
@@ -410,7 +428,11 @@ ipcMain.handle( 'submit-race', async (event, arg)=> {
 
 
 ipcMain.handle( 'resume-race', async ()=> {
-    if( global.settings.raceLoops && raceLoop>=global.settings.raceLoops) return 'Гонка завершена';
+    if( global.settings.raceLoops && raceLoop>=global.settings.raceLoops) {
+        const { dialog } = require('electron');
+        dialog.showMessageBoxSync({ 'message': 'Гонка завершена', 'type':'info'});
+        return 0;
+    }
     inCompetition=1;
     pause=0;
     if( !global.settings.withoutTVP ){
@@ -430,6 +452,8 @@ ipcMain.handle( 'resume-race', async ()=> {
 ipcMain.handle( 'save-settings', async (event, arg)=> {
     setSettings(arg);
     saveSettings(arg);
+    const { dialog } = require('electron');
+    dialog.showMessageBoxSync({ 'message': 'Сохранено', 'type':'info'});
     return 1;
 });
 
