@@ -186,6 +186,12 @@ oscServer.on('message', function (msg) {
 const OBSWebSocket = require('obs-websocket-js');
 const obs = new OBSWebSocket();
 
+// увидели событие - смена сцены
+obs.on('SwitchScenes', data => {
+    console.log(`New Active Scene: ${data.sceneName}`);
+});
+
+
 // You must add this handler to avoid uncaught exceptions.
 obs.on('error', err => {
     console.error('OBS socket error:', err);
@@ -401,6 +407,11 @@ ipcMain.handle( 'submit-race', async (event, arg)=> {
 
     saveSettings(arg);
 
+    // длительное подключение
+    if( arg['obsUse'] ){
+        await connectObs(arg['obsPort'], arg['obsPassword']);
+    }
+
     global.settings.pilots.forEach( function ( item ) {
         item.Results = [];
     });
@@ -416,9 +427,6 @@ ipcMain.handle( 'submit-race', async (event, arg)=> {
         sendRaceDuration(global.settings.raceTimer);
         if( rules[ global.settings.rules ].saveLaps === 0 ) sendRaceLaps(100);
         else sendRaceLaps(global.settings.raceLaps);
-    }
-    if( arg['obsUse'] ){
-        connectObs(arg['obsPort'], arg['obsPassword']);
     }
 
     console.log('submit-race pilots: ', global.settings.pilots);
@@ -477,6 +485,7 @@ ipcMain.on( 'start-race', ()=>{
 
 ipcMain.handle( 'stop-race', async ()=> {
     inCompetition=0;
+    if( global.settings.obsUse ) obs.disconnect();
     clearInterval(timeInterval);
 });
 
@@ -1101,38 +1110,33 @@ function isNumber(value) {
 /*
 OBS - подключиться
  */
-function connectObs(port, pass) {
-    obs.connect({
+async function connectObs(port, pass) {
+    await obs.connect({
         address: 'localhost:'+port,
         password: pass
     })
         .then(() => {
             console.log(`OBS: We're connected & authenticated.`);
 
-            return obs.send('GetSceneList');
+            //return obs.send('GetSceneList');
         })
-        .then(data => {
+        /*.then(data => {
             console.log(`${data.scenes.length} Available Scenes!`);
-            console.log('Using promises:', data);
+            console.log('Using promises:', data);*/
 
-            /*data.scenes.forEach(scene => {
-                if (scene.name !== data.currentScene) {
-                    console.log(`Found a different scene! Switching to Scene: ${scene.name}`);
+        /*data.scenes.forEach(scene => {
+            if (scene.name !== data.currentScene) {
+                console.log(`Found a different scene! Switching to Scene: ${scene.name}`);
 
-                    obs.send('SetCurrentScene', {
-                        'scene-name': scene.name
-                    });
-                }
-            });*/
-        })
+                obs.send('SetCurrentScene', {
+                    'scene-name': scene.name
+                });
+            }
+        });*/
+        /*})*/
         .catch(err => { // Promise convention dicates you have a catch on every chain.
             console.log(err);
         });
-
-    // увидели событие - смена сцены
-    obs.on('SwitchScenes', data => {
-        console.log(`New Active Scene: ${data.sceneName}`);
-    });
 }
 
 /*
