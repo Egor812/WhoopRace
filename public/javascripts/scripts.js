@@ -205,7 +205,7 @@ function showResults(data, loop) {
 }
 
 // Вывести группы пилотов в меню
-// pilotsG[][][Name, ]
+// pilotsG[][][Name, Channel, ]
 function showPilotsAll(pilotsG) {
     if( pilotsG === undefined ) return;
     const HTMLOUT = document.getElementById('list-pilots');
@@ -214,7 +214,7 @@ function showPilotsAll(pilotsG) {
     for (let group = 0; group < pilotsG.length; group++) {
         x += '<p> Группа ' + (group+1) + ':';
         for (let ii = 0; ii < pilotsG[group].length; ii++) {
-            x += '<span class="setup-pilots-badge badge badge-warning">' + pilotsG[group][ii]['Name'] + '</span>';
+            x += '<span class="setup-pilots-badge badge badge-warning">' + pilotsG[group][ii]['Name'] + ' <sup>'+ pilotsG[group][ii]['Channel'] +'</sup></span>';
             num++;
         }
         x += '</p>';
@@ -307,6 +307,10 @@ const settings = require('@electron/remote').getGlobal( "settings" );
 
 ipcRenderer.on('timer-value', (event, arg)=> {
     clockElm.text(arg);
+});
+
+ipcRenderer.on('20togo', ()=> {
+    if( settings.withoutTVP ) document.getElementById('wav-20secondstogo').play();
 });
 
 ipcRenderer.on('finish', ()=> {

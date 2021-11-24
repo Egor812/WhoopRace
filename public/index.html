@@ -22,6 +22,7 @@
   <audio id="wav-10" src="./data/10.wav" preload="auto"></audio>
   <audio id="wav-invite" src="./data/invite.wav" preload="auto"></audio>
   <audio id="wav-invitenext" src="./data/invitenext.wav" preload="auto"></audio>
+  <audio id="wav-20secondstogo" src="./data/20secondstogo.wav" preload="auto"></audio>
 </div>
 
 <div id="menu">
@@ -238,82 +239,82 @@
 </div>
 
 
-<div id="race" style="display: none">
-  <div id="group" class="badge badge-info" style="font-size: 1.5em;text-align: right;margin-bottom: 0;"> </div>
-  <div id="round" class="badge badge-secondary" style="font-size: 1.5em;text-align: right;margin-bottom: 0;"> </div>
-  <div id="group-pilots" class="row">
-      <div id="pilot-1" class="pilots col">
-        <span class='name'></span>
-        <span class='group-pilots-results' style="display: none">
-          <input type="number" class="form-control group-pilots-laps" id="gpl-1" title="круги" style="width: 50px; display:inline;" value="0">
-          <input type="number" class="form-control group-pilots-place" id="gpp-1" title="место" style="width: 50px; display:inline;" value="0">
-          <input type="text" class="form-control group-pilots-time" id="gpt-1" title="время" style="width: 100px; display:inline;" value="0">
-        </span>
-        <span class="ch top badge badge-pill badge-warning"></span>
-        <span class="judge bottom"></span>
-      </div>
-      <div id="pilot-2" class="pilots col">
-        <span class='name'></span>
-        <span class='group-pilots-results' style="display: none">
-          <input type="number" class="form-control group-pilots-laps" id="gpl-2" title="круги" style="width: 50px; display:inline;">
-          <input type="number" class="form-control group-pilots-place" id="gpp-2" title="место" style="width: 50px; display:inline;">
-          <input type="text" class="form-control group-pilots-time" id="gpt-2" title="время" style="width: 100px; display:inline;">
-        </span>
-        <span class="ch top badge badge-pill badge-warning"></span>
-        <span class="judge bottom"></span>
-      </div>
-      <div class="w-100"></div>
-      <div id="pilot-3" class="pilots col">
-        <span class='name'></span>
-        <span class='group-pilots-results' style="display: none">
-          <input type="number" class="form-control group-pilots-laps" id="gpl-3" title="круги" style="width: 50px; display:inline;">
-          <input type="number" class="form-control group-pilots-place" id="gpp-3" title="место" style="width: 50px; display:inline;">
-          <input type="text" class="form-control group-pilots-time" id="gpt-3" title="время" style="width: 100px; display:inline;">
-        </span>
-        <span class="ch top badge badge-pill badge-warning"></span>
-        <span class="judge bottom"></span>
-      </div>
-      <div id="pilot-4" class="pilots col">
-        <span class='name'></span>
-        <span class='group-pilots-results' style="display: none">
-          <input type="number" class="form-control group-pilots-laps" id="gpl-4" title="круги" style="width: 50px; display:inline;">
-          <input type="number" class="form-control group-pilots-place" id="gpp-4" title="место" style="width: 50px; display:inline;">
-          <input type="text" class="form-control group-pilots-time" id="gpt-4" title="время" style="width: 100px; display:inline;">
-        </span>
-        <span class="ch top badge badge-pill badge-warning"></span>
-        <span class="judge bottom"></span>
-      </div>
-  </div>
-  <div class="row justify-content-md-center">
-    <div id="group-next">
-      Готовятся:
-      <span id="pilot-next-1" class="badge badge-secondary"></span>
-      <span id="pilot-next-2" class="badge badge-secondary"></span>
-      <span id="pilot-next-3" class="badge badge-secondary"></span>
-      <span id="pilot-next-4" class="badge badge-secondary"></span>
+  <div id="race" style="display: none">
+    <div id="group" class="badge badge-info" style="font-size: 1.5em;text-align: right;margin-bottom: 0;"> </div>
+    <div id="round" class="badge badge-secondary" style="font-size: 1.5em;text-align: right;margin-bottom: 0;"> </div>
+    <div id="group-pilots" class="row">
+        <div id="pilot-1" class="pilots col">
+          <span class='name'></span>
+          <span class='group-pilots-results' style="display: none">
+            <input type="number" class="form-control group-pilots-laps" id="gpl-1" title="круги" style="width: 50px; display:inline;" value="0">
+            <input type="number" class="form-control group-pilots-place" id="gpp-1" title="место" style="width: 50px; display:inline;" value="0">
+            <input type="text" class="form-control group-pilots-time" id="gpt-1" title="время" style="width: 100px; display:inline;" value="0">
+          </span>
+          <span class="ch top badge badge-pill badge-warning"></span>
+          <span class="judge bottom"></span>
+        </div>
+        <div id="pilot-2" class="pilots col">
+          <span class='name'></span>
+          <span class='group-pilots-results' style="display: none">
+            <input type="number" class="form-control group-pilots-laps" id="gpl-2" title="круги" style="width: 50px; display:inline;">
+            <input type="number" class="form-control group-pilots-place" id="gpp-2" title="место" style="width: 50px; display:inline;">
+            <input type="text" class="form-control group-pilots-time" id="gpt-2" title="время" style="width: 100px; display:inline;">
+          </span>
+          <span class="ch top badge badge-pill badge-warning"></span>
+          <span class="judge bottom"></span>
+        </div>
+        <div class="w-100"></div>
+        <div id="pilot-3" class="pilots col">
+          <span class='name'></span>
+          <span class='group-pilots-results' style="display: none">
+            <input type="number" class="form-control group-pilots-laps" id="gpl-3" title="круги" style="width: 50px; display:inline;">
+            <input type="number" class="form-control group-pilots-place" id="gpp-3" title="место" style="width: 50px; display:inline;">
+            <input type="text" class="form-control group-pilots-time" id="gpt-3" title="время" style="width: 100px; display:inline;">
+          </span>
+          <span class="ch top badge badge-pill badge-warning"></span>
+          <span class="judge bottom"></span>
+        </div>
+        <div id="pilot-4" class="pilots col">
+          <span class='name'></span>
+          <span class='group-pilots-results' style="display: none">
+            <input type="number" class="form-control group-pilots-laps" id="gpl-4" title="круги" style="width: 50px; display:inline;">
+            <input type="number" class="form-control group-pilots-place" id="gpp-4" title="место" style="width: 50px; display:inline;">
+            <input type="text" class="form-control group-pilots-time" id="gpt-4" title="время" style="width: 100px; display:inline;">
+          </span>
+          <span class="ch top badge badge-pill badge-warning"></span>
+          <span class="judge bottom"></span>
+        </div>
     </div>
-  </div>
-    <div id="prepare-timer" class="timer"></div>
-    <div id="race-timer" class="timer"></div>
-
-  <div class="row justify-content-md-center">
-    <div class="btn-toolbar" role="toolbar">
-      <div id="pagination" class="btn-group mr-2" role="group">
-      </div>
-      <div class="btn-group mr-2" role="group">
-        <button type="button" class="btn btn-outline-primary" id="start-now" data-group="0">Старт</button>
-        <button type="button" class="btn btn-outline-primary" id="rerace" data-group="0">Перелет</button>
+    <div class="row justify-content-md-center">
+      <div id="group-next">
+        Готовятся:
+        <span id="pilot-next-1" class="badge badge-secondary"></span>
+        <span id="pilot-next-2" class="badge badge-secondary"></span>
+        <span id="pilot-next-3" class="badge badge-secondary"></span>
+        <span id="pilot-next-4" class="badge badge-secondary"></span>
       </div>
     </div>
-  </div>
-  <div id='stop-race' style="position:absolute; top:0; right:0; cursor:pointer">X</div>
-</div>
+      <div id="prepare-timer" class="timer"></div>
+      <div id="race-timer" class="timer"></div>
 
-<div id="results" style="display: none">
-  <div id="result-round" class="badge badge-secondary" style="font-size: 1.5em;text-align: right;margin-bottom: 0;"> </div>
-  <div id="result-table" style="margin-top: 30px"></div>
-  <div id='close-stat' style="position:absolute; top:0; right:0; cursor:pointer">X</div>
-</div>
+    <div class="row justify-content-md-center">
+      <div class="btn-toolbar" role="toolbar">
+        <div id="pagination" class="btn-group mr-2" role="group">
+        </div>
+        <div class="btn-group mr-2" role="group">
+          <button type="button" class="btn btn-outline-primary" id="start-now" data-group="0">Старт</button>
+          <button type="button" class="btn btn-outline-primary" id="rerace" data-group="0">Перелет</button>
+        </div>
+      </div>
+    </div>
+    <div id='stop-race' style="position:absolute; top:0; right:0; cursor:pointer">X</div>
+  </div>
+
+    <div id="results" style="display: none">
+      <div id="result-round" class="badge badge-secondary" style="font-size: 1.5em;text-align: right;margin-bottom: 0;"> </div>
+      <div id="result-table" style="margin-top: 30px"></div>
+      <div id='close-stat' style="position:absolute; top:0; right:0; cursor:pointer">X</div>
+    </div>
 
 
 </body>

@@ -674,6 +674,11 @@ function initializeClock(id, counter, endFunc = function(){return 0}) {
                 endFunc();
                 //timerCur = 0;
             }
+            else {
+                if(inCompetition===1 && inRace===0 && timerCur===20){
+                    mainWindow.webContents.send('20togo');
+                }
+            }
         }
         else {
             mainWindow.webContents.send('timer-value', 'II');
