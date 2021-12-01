@@ -127,18 +127,23 @@ function switchToPreraceTimer()
     clockElm.show();
 }
 
-function race(rules)
+function race(rules, win32)
 {
     elmStartNow.hide();
     switchToRaceTimer();
     if( settings.withoutTVP ) {
         for( let i=0; i<4; i++) {
-            if (!rules.savePlace) $('#gpp-' + (i + 1)).hide();
-            if (!rules.saveLaps) $('#gpl-' + (i + 1)).hide();
-            if (!rules.saveTime) $('#gpt-' + (i + 1)).hide();
+            $('#gpp-' + (i+1)).val(0);
+            $('#gpl-' + (i+1)).val(0);
+            $('#gpt-' + (i+1)).val(0);
+            if (!rules.savePlace) $('#gpp-' + (i + 1)).hide(); else $('#gpp-' + (i + 1)).show();
+            if (!rules.saveLaps) $('#gpl-' + (i + 1)).hide(); else $('#gpl-' + (i + 1)).show();
+            if (!rules.saveTime) $('#gpt-' + (i + 1)).hide(); else $('#gpt-' + (i + 1)).show();
         }
-        $('.group-pilots-results').show();
-        document.getElementById('wav-counter').play();
+        $('.group-pilots-results').css( "display", "block" );
+        // Эта собака грохает приложение под виндой.
+        // Тесты выявили, что так делает любой wav больше 202796 байт
+        if( !win32) document.getElementById('wav-counter').play();
     }
 }
 
@@ -149,21 +154,24 @@ data[][ pilot, pos, lps, total ]
 function results(data, rules)
 {
     switchToPreraceTimer();
-    console.log( 'rules:'+rules);
+    //console.log( 'rules:'+rules);
+    //console.log( data );
     for( let i=0; i<4; i++){
-        if( !rules.savePlace )  $('#gpp-' + (i+1)).hide();
-        if( !rules.saveLaps )  $('#gpl-' + (i+1)).hide();
-        if( !rules.saveTime )  $('#gpt-' + (i+1)).hide();
-        if( typeof data[i] !== 'undefined' ) {
-            $('#gpp-' + (i+1)).val(data[i].pos);
-            $('#gpl-' + (i+1)).val(data[i].lps);
-            $('#gpt-' + (i+1)).val(Number((data[i].total).toFixed(2)));
+        if (!rules.savePlace) $('#gpp-' + (i + 1)).hide(); else $('#gpp-' + (i + 1)).show();
+        if (!rules.saveLaps) $('#gpl-' + (i + 1)).hide(); else $('#gpl-' + (i + 1)).show();
+        if (!rules.saveTime) $('#gpt-' + (i + 1)).hide(); else $('#gpt-' + (i + 1)).show();
+        if( data !== null ) {
+            if( typeof data[i] !== 'undefined' ) {
+                $('#gpp-' + (i+1)).val(data[i].pos);
+                $('#gpl-' + (i+1)).val(data[i].lps);
+                $('#gpt-' + (i+1)).val(Number((data[i].total).toFixed(2)));
+            }
         }
     }
     $('.group-pilots-results').css( "display", "block" );
     elmRerace.show();
     elmPagination.hide();
-    console.log(data);
+    //console.log(data);
 }
 
 // data[][ Results[laps pos time], Sums[pos ] ]
@@ -310,7 +318,7 @@ ipcRenderer.on('timer-value', (event, arg)=> {
 });
 
 ipcRenderer.on('20togo', ()=> {
-    if( settings.withoutTVP ) document.getElementById('wav-20secondstogo').play();
+    document.getElementById('wav-20secondstogo').play();
 });
 
 ipcRenderer.on('finish', ()=> {
@@ -323,7 +331,7 @@ ipcRenderer.on('editresults', (event, arg)=> {
 
 
 ipcRenderer.on('show-race', (event, arg)=> {
-    race( arg['rules'] );
+    race( arg['rules'], arg['win32'] );
 });
 
 ipcRenderer.on('show-prerace', (event, arg)=> {

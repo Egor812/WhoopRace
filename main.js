@@ -14,6 +14,11 @@ let pause = 0;
 const electron = require('electron');
 const main = electron.app;  // Модуль контролирующей жизненный цикл нашего приложения.
 const BrowserWindow = electron.BrowserWindow;  // Модуль создающий браузерное окно.
+//main.commandLine.appendSwitch('enable-logging');
+
+const os = require('os');
+let win32=0;
+if( os.platform()==='win32') win32=1;
 
 require('@electron/remote/main').initialize();
 
@@ -220,7 +225,7 @@ main.on('window-all-closed', function() {
 // и будет готов к созданию браузерных окон.
 main.on('ready', function() {
     // Создаем окно браузера.
-    mainWindow = new BrowserWindow({width: 1200,
+    mainWindow = new BrowserWindow({width: 1240,
         height: 1000,
         backgroundColor: '0',
         webPreferences: {
@@ -700,15 +705,18 @@ function startRace() {
     if( global.settings.obsUse && !global.settings.withoutTVP ) {
         changeSceneObs( global.settings.obsSceneTVP);
     }
-    mainWindow.webContents.send('show-race', {rules : rules[global.settings.rules]} );
+    mainWindow.webContents.send('show-race', {rules : rules[global.settings.rules], win32 : win32} );
     if( !global.settings.withoutTVP){
         sendStartCommand();
     }
     inRace = 1; // после команды на старт!
     if ( global.settings.raceTimer !==0) {
         if (global.settings.withoutTVP) {
-            delay(5000, 1).then(() => {
-                initializeClock('race-timer', global.settings.raceTimer, finishRace)
+            if( win32 ) {
+                playSoundCountOnWin();
+            }
+            delay(5500, 1).then(() => {
+                if( inRace) initializeClock('race-timer', global.settings.raceTimer, finishRace); // проверка на случай смены группы, пока считает таймер
             });
         } else {
             // ждем сообщение от TVP
@@ -733,14 +741,19 @@ function finishRace(stat = null)
     if( rules[global.settings.rules].savePlace+rules[global.settings.rules].saveTime+rules[global.settings.rules].saveLaps!==0 ){
         console.log( 'finishRace: ', stat );
         console.log( 'finishRace: ', rules[global.settings.rules] );
-        if( stat === null || stat.length === 0) stat = emptyCorrection( global.settings.groups[groupCur].length );
-        else stat=zeroCorrection(stat);
+        if( global.settings.withoutTVP ) {
+            stat = null;
+        }
+        else {
+            if (stat === null || stat.length === 0) stat = emptyCorrection(global.settings.groups[groupCur].length);
+            else stat = zeroCorrection(stat);
+        }
         console.log( 'correction:', stat);
         mainWindow.webContents.send('editresults', { stat : stat, rules : rules[global.settings.rules] });
         if( global.settings.obsUse ) changeSceneObs( global.settings.obsSceneWR);
         if( global.settings.withoutTVP ) {
             pausePrerace();
-            initializeClock('prepare-timer', 3, saveRaceReq);
+            initializeClock('prepare-timer', 2, saveRaceReq);
         } // автопауза для заполнения таблицы результатов
         else initializeClock('prepare-timer', 5, saveRaceReq); // пауза для проверки результатов
     }
@@ -766,7 +779,7 @@ function zeroCorrection(stat)
 }
 
 // TVP может не выдать результат, если все пилоты не вылетели
-function emptyCorrection( num) {
+function emptyCorrection( num ) {
     let res = [];
     for( let i=0; i< num; i++){
         res[i]={pos:i+1, lps:0, total:0};
@@ -954,8 +967,10 @@ function showFinalResults( pilots, rules ) {
 }
 
 function startPrerace(){
+    inRace = 0;
     pause = 0;
-    //clearInterval(timeInterval);
+
+    clearInterval(timeInterval);
     mainWindow.webContents.send('show-prerace', { group : groupCur, round : raceLoop, showNext : rules[ global.settings.rules ].showNext, wavGroup : rules[ global.settings.rules ].wavNextNum });
 
     if( global.settings.obsUse ) {
@@ -1340,4 +1355,12 @@ function posDE8( ret ) {
         if (a.Sums.pos > b.Sums.pos) return 1;
         if (a.Sums.pos < b.Sums.pos) return -1;
     }
+}
+
+// Костыль. Приложение падает под виндой. Пробовал обновлять Node, electron, electron-packager, wine
+function playSoundCountOnWin() {
+    const sound = require("sound-play");
+    const path = require("path");
+    const filePath = path.join(__dirname, "/public/data/count.wav");
+    sound.play(filePath);
 }

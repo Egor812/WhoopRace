@@ -1,9 +1,9 @@
 {
   "name": "whooprace.app",
-  "version": "0.0.5",
+  "version": "0.0.7",
   "main": "main.js",
   "devDependencies": {
-    "electron": "^15.3.1"
+    "electron": "^16.0.2"
   },
   "scripts": {
     "start": "APP_DEV=true electron .",
@@ -17,6 +17,7 @@
     "jquery": "^3.6.0",
     "node-osc": "^6.1.4",
     "obs-websocket-js": "^4.0.3",
+    "sound-play": "^1.1.0",
     "xlsx": "^0.16.9"
   }
 }
