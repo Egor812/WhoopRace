@@ -1,13 +1,25 @@
 body {
-  padding: 50px;
   font-family: "Lucida Grande", Helvetica, Arial, sans-serif;
-  margin:10px 250px;
   background: black;
   color: white;
 }
 
 a {
   color: #00B7FF;
+}
+
+#menu{
+  padding: 50px;
+  margin: 10px  250px;
+}
+
+#race{
+  padding: 50px;
+  margin: 10px  250px;
+}
+
+#results{
+  padding: 50px 100px;
 }
 
 .setup-pilots-badge{

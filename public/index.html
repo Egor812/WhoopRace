@@ -151,14 +151,17 @@
     </div>
 
     <div class="form-group">
-      <button id="save-settings" type="button" class="btn btn-primary">Сохранить</button>
-      <button id="submit-race" type="button" class="btn btn-primary">Создать гонку</button>
+      <button id="save-settings" type="button" class="btn btn-primary">Сохранить настройки</button>
+      <button id="submit-race" type="button" class="btn btn-primary">Создать новую гонку</button>
     </div>
 
     <div class="form-group" id="menu-this-race">
       <button id="resume-race" type="button" class="btn btn-primary">Продолжить гонку</button>
       <button id="race-stat" type="button" class="btn btn-primary">Текущие результаты</button>
       <button id="export-xls" type="button" class="btn btn-primary">Экспорт в XLS</button>
+    </div>
+    <div class="form-group">
+      <button id="terminate-race" type="button" class="btn btn-danger">Завершить гонку</button>
     </div>
     <div id="race-progress">    </div>
 
@@ -232,6 +235,13 @@
           <div class="w-100"></div>
         </div>
       </div>
+      <div id="showDE8process">
+        <a href="#" onclick="$('#showDE8process > div.row').toggle()">Сетка Double Elimination 8</a>
+        <div class="row" style="display: none; position: absolute; width:1197px; margin: auto;  left: 0;  right: 0;  text-align: center;  z-index: 1;">
+          <img src="./data/de8.jpg">
+        </div>
+      </div>
+
       <a href="#" id="getXLSTemplate">Получить XLS шаблон</a>
 
     </div>
@@ -239,7 +249,7 @@
 </div>
 
 
-  <div id="race" style="display: none">
+<div id="race" style="display: none">
     <div id="group" class="badge badge-info" style="font-size: 1.5em;text-align: right;margin-bottom: 0;"> </div>
     <div id="round" class="badge badge-secondary" style="font-size: 1.5em;text-align: right;margin-bottom: 0;"> </div>
     <div id="group-pilots" class="row">
@@ -310,11 +320,11 @@
     <div id='stop-race' style="position:absolute; top:0; right:0; cursor:pointer">X</div>
   </div>
 
-    <div id="results" style="display: none">
-      <div id="result-round" class="badge badge-secondary" style="font-size: 1.5em;text-align: right;margin-bottom: 0;"> </div>
-      <div id="result-table" style="margin-top: 30px"></div>
-      <div id='close-stat' style="position:absolute; top:0; right:0; cursor:pointer">X</div>
-    </div>
+<div id="results" style="display: none">
+  <div id="result-round" class="badge badge-secondary" style="font-size: 1.5em;margin-bottom: 0;"> </div>
+  <div id="result-table" style="margin-top: 30px"></div>
+  <div id='close-stat' style="position:absolute; top:0; right:0; cursor:pointer">X</div>
+</div>
 
 
 </body>

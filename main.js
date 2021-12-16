@@ -17,7 +17,7 @@ const BrowserWindow = electron.BrowserWindow;  // Модуль создающи�
 //main.commandLine.appendSwitch('enable-logging');
 
 const os = require('os');
-let win32=0;
+let win32=0; // для лечения бага в Хромиуме под виндой
 if( os.platform()==='win32') win32=1;
 
 require('@electron/remote/main').initialize();
@@ -88,7 +88,8 @@ const rules =[
         minPilots: 1,   // участников не меньше
         maxPilots: 100, // участников не больше
         showNext: 1,    // показывать на экране приглашения готовящуюся группу
-        wavNextNum: 1   // 1 - вызывается группа {номер}, 0 - вызывается следующая группа
+        wavNextNum: 1,   // 1 - вызывается группа {номер}, 0 - вызывается следующая группа
+        lapsLimit: 0    // гонка на Х кругов
     },
     {
         id: 2,
@@ -99,7 +100,8 @@ const rules =[
         minPilots: 1,
         maxPilots: 100,
         showNext: 1,
-        wavNextNum: 1
+        wavNextNum: 1,
+        lapsLimit: 0
     },
     {},
     {
@@ -114,7 +116,8 @@ const rules =[
         loops: 6,
         groups: 1,
         showNext: 0,
-        wavNextNum: 0
+        wavNextNum: 0,
+        lapsLimit: 1
     },
     {
         id: 5,
@@ -125,7 +128,8 @@ const rules =[
         minPilots: 1,
         maxPilots: 4,
         showNext: 1,
-        wavNextNum: 0
+        wavNextNum: 0,
+        lapsLimit: 1
     },
 
 ];
@@ -385,8 +389,12 @@ ipcMain.handle( 'parse-xls', async (event, arg)=> {
 });
 
 ipcMain.handle( 'repackGroups', async (event, arg) =>{
+    if( global.settings.pilots.length<rules[arg].minPilots || global.settings.pilots.length>rules[arg].maxPilots ) {
+        dialog.showErrorBox('Ошибка', 'Количество пилотов не соответствует выбранным правилам');
+        return false;
+    }
     global.settings.groups = preparePilotsGroups(global.settings.pilots, arg);
-    global.settings.pilots = addJudges(global.settings.pilots, global.settings.rules);
+    global.settings.pilots = addJudges(global.settings.pilots, arg);
     store.set('pilots', global.settings.pilots);
     return global.settings.groups;
 });
@@ -423,14 +431,15 @@ ipcMain.handle( 'submit-race', async (event, arg)=> {
 
     raceLoop=0;
     groupCur=0;
+    inCompetition=1;
     store.set('groupCur', groupCur);
     store.set('raceLoop', raceLoop);
+    store.set('inCompetition', inCompetition);
 
-    inCompetition=1;
     pause=0;
     if( !arg['withoutTVP']){
         sendRaceDuration(global.settings.raceTimer);
-        if( rules[ global.settings.rules ].saveLaps === 0 ) sendRaceLaps(100);
+        if( rules[ global.settings.rules ].lapsLimit === 0 ) sendRaceLaps(100);
         else sendRaceLaps(global.settings.raceLaps);
     }
 
@@ -440,22 +449,27 @@ ipcMain.handle( 'submit-race', async (event, arg)=> {
 });
 
 
+// подготовка к возобновлению гонки
 ipcMain.handle( 'resume-race', async ()=> {
     if( global.settings.raceLoops && raceLoop>=global.settings.raceLoops) {
         const { dialog } = require('electron');
         dialog.showMessageBoxSync({ 'message': 'Гонка завершена', 'type':'info'});
         return 0;
     }
-    inCompetition=1;
+    inCompetition=1; // del?
     pause=0;
     if( !global.settings.withoutTVP ){
         sendRaceDuration(global.settings.raceTimer);
-        if( rules[ global.settings.rules ].saveLaps === 0 ) sendRaceLaps(100);
+        if( rules[ global.settings.rules ].lapsLimit === 0 ) sendRaceLaps(100);
         else sendRaceLaps(global.settings.raceLaps);
     }
     if( global.settings.obsUse ){
         connectObs( global.settings.obsPort, global.settings.obsPassword);
     }
+    if( rulesFunc[ global.settings.rules ].fRaceNext !== undefined)  {
+        global.settings.groups[0] = rulesFunc[ global.settings.rules ].fRaceNext(global.settings.pilots, raceLoop);
+    }
+
     return 1;
 });
 
@@ -488,10 +502,15 @@ ipcMain.on( 'start-race', ()=>{
     startRace();
 });
 
-ipcMain.handle( 'stop-race', async ()=> {
-    inCompetition=0;
-    if( global.settings.obsUse ) obs.disconnect();
+ipcMain.handle( 'suspend-race', async ()=> {
+    //inCompetition=0;
+    if( global.settings.obsUse ) obs.disconnect(); // на случай обрыва соединения с ОБС по любой причине. Выйдя в меню и вернувшись в гонку - мы переподключаемся.
     clearInterval(timeInterval);
+});
+
+ipcMain.on('terminate-race', ()=>{
+    inCompetition = 0;
+    store.set('inCompetition', inCompetition);
 });
 
 ipcMain.on( 'add-prerace-time',  ()=> {
@@ -503,6 +522,12 @@ ipcMain.on( 'pause-prerace',  ()=> {
     if( !inRace ) pausePrerace();
     return 1
 });
+
+ipcMain.on( 'pause-results',  ()=> {
+    if( !inRace ) pausePrerace();
+    return 1
+});
+
 
 /*
 Получить результаты для статистики вызванной из меню
@@ -520,8 +545,7 @@ ipcMain.on( 'get-stat',  ()=> {
 
 
 ipcMain.handle( 'get-progress',  ()=> {
-
-    return { raceLoop: raceLoop, groupCur: groupCur, rulesName: getRulesName() };
+    return { inCompetition: inCompetition, raceLoop: raceLoop, groupCur: groupCur, rulesName: getRulesName() };
 });
 
 // Получаем результаты гонки с формы и сохраняем
@@ -667,7 +691,7 @@ ipcMain.on( 'export-xls',  ()=> {
     showSaveDialog( mainWindow, options, wb, XLSX);
 });
 
-
+/*todo убрать id*/
 function initializeClock(id, counter, endFunc = function(){return 0}) {
 
     function updateClock() {
@@ -701,6 +725,20 @@ function startRace() {
     clearInterval(timeInterval); // не убирать из-за delay ниже
     pause = 0;
     console.log( 'Start G'+(groupCur+1)+'/'+global.settings.groups.length+' L'+(raceLoop+1)+'/'+global.settings.raceLoops);
+
+    // отправить пилотов в TVP
+    if( !global.settings.withoutTVP ) {
+        for (let i = 0; i < 4; i++) {
+            if( i < global.settings.groups[groupCur].length) {
+                sendPilotName(i + 1, global.settings.groups[groupCur][i]['Name']);
+                onCamera(i+1);
+            }
+            else {
+                sendPilotName(i + 1, '');
+                offCamera(i+1)
+            }
+        }
+    }
 
     if( global.settings.obsUse && !global.settings.withoutTVP ) {
         changeSceneObs( global.settings.obsSceneTVP);
@@ -800,8 +838,7 @@ function saveRaceReq() {
 function findPilotInLoop(pilots, loop, place) {
     //console.log('l', loop, 'p', place);
     for (let i = 0; i < pilots.length; i++) {
-        //console.log(pilots[i].Results);
-        if( pilots[i].Results[loop] !== undefined) {
+        if( pilots[i].Results[loop] !== undefined && pilots[i].Results[loop] !== null ) {
             if (pilots[i].Results[loop].pos === place) return i;
         }
     }
@@ -870,6 +907,7 @@ function seedDE8group(pilots, race){
     return group;
 }
 
+// группы для отображения в меню
 function seedDE8groupsOnLoad( pilots ) {
     let group = [];
     if( pilots.length>=8) {
@@ -978,19 +1016,6 @@ function startPrerace(){
     }
     console.log( 'Invitation G'+(groupCur+1)+'/'+global.settings.groups.length+' L'+(raceLoop+1)+'/'+global.settings.raceLoops);
 
-    // отправить пилотов в TVP
-    if( !global.settings.withoutTVP ) {
-        for (let i = 0; i < 4; i++) {
-            if( i < global.settings.groups[groupCur].length) {
-                sendPilotName(i + 1, global.settings.groups[groupCur][i]['Name']);
-                onCamera(i+1);
-            }
-            else {
-                sendPilotName(i + 1, '');
-                offCamera(i+1)
-            }
-        }
-    }
 
     if(  global.settings.prepareTimer!==0 )  {
         let fn;
@@ -1031,7 +1056,9 @@ function preparePilotsGroups(pilotsObj, rulesNum) {
     let pilotsG = [];
     if( pilotsObj === undefined ) return pilotsG;
 
-    if( rulesFunc[ rulesNum ].fGroupsOnLoad !== undefined ) pilotsG = rulesFunc[ rulesNum ].fGroupsOnLoad(pilotsObj);
+    if( rulesFunc[ rulesNum ].fGroupsOnLoad !== undefined && pilotsObj.length>=rules[rulesNum].minPilots && pilotsObj.length<=rules[rulesNum].maxPilots) {
+        pilotsG = rulesFunc[ rulesNum ].fGroupsOnLoad(pilotsObj);
+    }
     else {
         //стандартное заполнение групп по данным из pilots
         for (let i = 0; i < pilotsObj.length; i++) {
@@ -1190,6 +1217,8 @@ function loadSettings() {
     global.settings.groups = preparePilotsGroups(global.settings.pilots, global.settings.rules);
     groupCur = store.get('groupCur',0);
     raceLoop = store.get('raceLoop',0);
+    inCompetition = store.get('inCompetition', 0);
+
 }
 
 /*
@@ -1336,10 +1365,12 @@ function posBattle4( ret ) {
     }
 }
 
+// присудить места по завершению DE8
 function posDE8( ret ) {
     // 2 - p3 -> 7, p4 -> 8,
     // 4 - p3 -> 5, p4 -> 6
     // 5 - p1..4
+    //присваиваем места
     ret[findPilotInLoop(ret, 2, 4)].Sums.pos=8;
     ret[findPilotInLoop(ret, 2, 3)].Sums.pos=7;
     ret[findPilotInLoop(ret, 4, 4)].Sums.pos=6;
@@ -1348,6 +1379,7 @@ function posDE8( ret ) {
     ret[findPilotInLoop(ret, 5, 3)].Sums.pos=3;
     ret[findPilotInLoop(ret, 5, 2)].Sums.pos=2;
     ret[findPilotInLoop(ret, 5, 1)].Sums.pos=1;
+    //сортируем по возрастанию
     ret.sort( compareDE8 );
     return ret;
 

@@ -8,11 +8,24 @@ const elmResults = $('#results');
 const elmRerace = $('#rerace');
 const elmStartNow = $('#start-now');
 
-function showMenu(settings, raceLoop, groupCur, rulesName) {
+function showMenu(settings, inCompetition, raceLoop, groupCur, rulesName) {
     setSettings(settings);
     showPilotsAll(settings.groups);
     rulesChangeRender();
-    if( raceLoop<settings.raceLoops) {
+    if( inCompetition){
+        $('#terminate-race').show();
+        $('#rulesSelector').attr('disabled', true);
+        $('#submit-race').hide();
+        $('#showOpendialog').attr('disabled', true);
+    }
+    else{
+        $('#terminate-race').hide();
+        $('#rulesSelector').attr('disabled', false);
+        $('#submit-race').show();
+        $('#showOpendialog').attr('disabled', false);
+    }
+    //if( raceLoop<settings.raceLoops) {
+    if( inCompetition && raceLoop<settings.raceLoops) {
         document.getElementById('race-progress').innerHTML = `${rulesName} Продолжить с раунда ${raceLoop+1} и группы ${groupCur+1}`;
         $('#resume-race').show();
     }
@@ -122,9 +135,14 @@ function switchToPreraceTimer()
 {
     clockRaceElm.hide();
     clockElm = clockPrepareElm;
-    if( settings.prepareTimer===0 ) clockElm.text('');
-    else clockElm.text(settings.prepareTimer);
+    clockElm.html("&nbsp;"); // так сохраняется место под будущий таймер и нет проблемы с начальными значениями не из  settings.prepareTimer
+    //if( settings.prepareTimer===0 ) clockElm.text('');
+    //else clockElm.text(settings.prepareTimer);
     clockElm.show();
+}
+
+function switchToResultsTimer() {
+    clockElm = $('#resultsTimer');
 }
 
 function race(rules, win32)
@@ -197,7 +215,7 @@ function showResults(data, loop) {
             if( pilot.Results[i] !== undefined) {
                 if (pilot.Results[i].laps !== false) x += '<span class="result-cell" style="width: 20px;">' + pilot.Results[i].laps + '</span>';
                 if (pilot.Results[i].pos !== false) x += '<span class="result-cell" style="width: 20px;">' + pilot.Results[i].pos + '</span>';
-                if (pilot.Results[i].time !== false) x += '<span class="result-cell" style="width: 60px;">' + pilot.Results[i].time + '</span>';
+                if (pilot.Results[i].time !== false) x += '<span class="result-cell" style="width: 60px; color:gray;">' + pilot.Results[i].time + '</span>';
             }
             x += '</span>';
         }
@@ -208,6 +226,8 @@ function showResults(data, loop) {
         }
         x +='<br>';
     });
+
+    x += '<span id="resultsTimer" style="text-align: right; width: 100%; display: inline-block; margin-top: 10px">...</span>';
 
     HTMLOUT.innerHTML = x;
 }
@@ -357,6 +377,7 @@ ipcRenderer.on('query-results', ()=> {
 
 ipcRenderer.on('show-results', (event, arg)=> {
     showResults( arg['results'], arg['round'] );
+    switchToResultsTimer();
 });
 
 
@@ -413,14 +434,14 @@ window.setup = window.setup || {}, // откуда я это взял? как э
                 });
             },
 
-            // остановить гонку (Х)
+            // выйти из гонки в меню (Х)
             exitRace: function(){
                 elmRace.hide();
                 elmResults.hide();
-                ipcRenderer.invoke('stop-race').then( () => {
+                ipcRenderer.invoke('suspend-race').then( () => {
                     ipcRenderer.invoke('get-progress').then( result  => {
                         $('menu-this-race').show();
-                        showMenu( settings, result.raceLoop, result.groupCur, result.rulesName);
+                        showMenu( settings, result.inCompetition, result.raceLoop, result.groupCur, result.rulesName);
                     });
                 });
             },
@@ -436,6 +457,14 @@ window.setup = window.setup || {}, // откуда я это взял? как э
                     if( result===1 ) {
                         ipcRenderer.send('start-prerace', {group: false});
                     }
+                });
+            },
+
+            // завершить гонку
+            terminateRace: function(){
+                ipcRenderer.send('terminate-race');
+                ipcRenderer.invoke('get-progress').then( result  => {
+                    showMenu(settings, result.inCompetition, result.raceLoop, result.groupCur, result.rulesName);
                 });
             },
 
@@ -462,6 +491,10 @@ window.setup = window.setup || {}, // откуда я это взял? как э
             // пауза
             pausePreRace: function() {
                 ipcRenderer.send('pause-prerace');
+            },
+
+            pauseResults: function() {
+                ipcRenderer.send('pause-results');
             },
 
             // экспорт результатов в XLS
@@ -514,6 +547,10 @@ window.setup = window.setup || {}, // откуда я это взял? как э
                 $('#resume-race').click( function () {
                     setup.handler.resumeRace();
                 });
+                $('#terminate-race').click( function () {
+                    setup.handler.terminateRace();
+                });
+
                 $('#export-xls').click( function () {
                     setup.handler.exportXLS();
                 });
@@ -537,12 +574,18 @@ window.setup = window.setup || {}, // откуда я это взял? как э
                         if (clockPrepareElm.is(":visible")) {
                             setup.handler.pausePreRace();
                         }
+                        else{
+                            if( $('#resultsTimer').is(':visible')){
+                                setup.handler.pauseResults();
+                            }
+                        }
                     }
                 });
+                // основное меню - смена правил
                 $( "#rulesSelector" ).change( function() {
                     ipcRenderer.invoke('repackGroups', getFormRulesVal() ).then( (result) => {
                         console.log(result);
-                        showPilotsAll(result);
+                        if( result!==false) showPilotsAll(result);
                     });
                     rulesChangeRender();
                 });
@@ -553,7 +596,7 @@ window.setup = window.setup || {}, // откуда я это взял? как э
 
                 $(function() {  // on ready
                     ipcRenderer.invoke('get-progress').then( result  => {
-                        showMenu( settings, result.raceLoop, result.groupCur, result.rulesName);
+                        showMenu( settings, result.inCompetition, result.raceLoop, result.groupCur, result.rulesName);
                     });
                 });
 
