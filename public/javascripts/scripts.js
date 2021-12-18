@@ -10,7 +10,7 @@ const elmStartNow = $('#start-now');
 
 function showMenu(settings, inCompetition, raceLoop, groupCur, rulesName) {
     setSettings(settings);
-    showPilotsAll(settings.groups);
+    //showPilotsAll(settings.groups);
     rulesChangeRender();
     if( inCompetition){
         $('#terminate-race').show();
@@ -72,7 +72,7 @@ function prerace(group=0, round = 0, showNext= 1, wawGroup = 1) {
             $('#pilot-'+(i+1)).show();
             elmPilots[i].text(groups[groupThis][i]['Name']);
             $('#pilot-' + (i + 1) + ' > .ch').text(groups[groupThis][i]['Channel']);
-            if (settings.judges) $('#pilot-' + (i + 1) + ' > .judge').text(groups[groupThis][i]['Judges']);
+            //if (settings.judges) $('#pilot-' + (i + 1) + ' > .judge').text(groups[groupThis][i]['Judges']);
         }
         else $('#pilot-'+(i+1)).hide();
     }
@@ -80,9 +80,13 @@ function prerace(group=0, round = 0, showNext= 1, wawGroup = 1) {
     groupNext = groupThis + 1;
     if (groupNext >= groupMax) groupNext = 0;
     if( showNext ) {
-        for (let i = 0; i < groups[groupNext].length; i++) {
+        for( let i=0; i<4; i++ ){
             elmPilotsNext[i] = $('#pilot-next-'+(i+1));
-            elmPilotsNext[i].text(groups[groupNext][i]['Name']);
+            if( i<groups[groupNext].length ) {
+                elmPilotsNext[i].show();
+                elmPilotsNext[i].text(groups[groupNext][i]['Name']);
+            }
+            else elmPilotsNext[i].hide();
         }
         $('#group-next').show();
     }
@@ -235,7 +239,7 @@ function showResults(data, loop) {
 // Вывести группы пилотов в меню
 // pilotsG[][][Name, Channel, ]
 function showPilotsAll(pilotsG) {
-    if( pilotsG === undefined ) return;
+    if( pilotsG === undefined || pilotsG === false ) return;
     const HTMLOUT = document.getElementById('list-pilots');
     let x='';
     let num=0;
@@ -273,7 +277,7 @@ function rulesChangeRender()
 Заполнение формы setup
  */
 function setSettings(settings) {
-    if( settings['judges'] ) $('#checkbox-judge').prop('checked', true);
+    //if( settings['judges'] ) $('#checkbox-judge').prop('checked', true);
     if( settings['withoutTVP'] ) $('#checkbox-without-tvp').prop('checked', true);
     if( settings['obsUse'] ) $('#checkbox-obsUse').prop('checked', true);
     if( settings['rules'] ) $('#rulesSelector option[value='+settings['rules']+']').attr('selected','selected');
@@ -292,8 +296,8 @@ function setSettings(settings) {
 Получить данные формы настроек
  */
 function getSettingsFromForm(){
-    let judges, withoutTVP, obsUse;
-    if( $('#checkbox-judge').is(':checked') ) judges=1; else judges=0;
+    let judges=0, withoutTVP, obsUse;
+    //if( $('#checkbox-judge').is(':checked') ) judges=1; else judges=0;
     if( $('#checkbox-obsUse').is(':checked') ) obsUse=1; else obsUse=0;
     if( $('#checkbox-without-tvp').is(':checked') ) withoutTVP=1; else withoutTVP=0;
     const rules = Number($("#rulesSelector option:selected").val());
@@ -308,6 +312,10 @@ function getSettingsFromForm(){
     let obsSceneBreak = $('#obsSceneBreak').val();
     return {judges: judges, withoutTVP: withoutTVP, prepareTimer: prepareTimer, raceTimer : raceTimer, raceLoops: raceLoops, rules: rules,
         obsUse:obsUse, obsPort:obsPort, obsSceneTVP:obsSceneTVP, obsSceneWR:obsSceneWR, obsSceneBreak:obsSceneBreak, obsPassword:obsPassword, raceLaps:raceLaps};
+}
+
+function getRulesFromForm() {
+    return Number($("#rulesSelector option:selected").val());
 }
 
 /*
@@ -359,7 +367,11 @@ ipcRenderer.on('show-prerace', (event, arg)=> {
 });
 
 ipcRenderer.on('open-dialog-paths-selected', (event, arg)=> {
-    setup.handler.outputSelectedPathsFromOpenDialog(arg);
+    // сохраняем выбранные правила, так как они нужны для парсинга
+    let rules = getRulesFromForm();
+    ipcRenderer.send('save-rules', rules);
+
+    //setup.handler.outputSelectedPathsFromOpenDialog(arg); //?
     // запрос с промисом
     ipcRenderer.invoke('parse-xls', arg).then( result => {
         showPilotsAll(result);
@@ -426,10 +438,9 @@ window.setup = window.setup || {}, // откуда я это взял? как э
             submitRace: function(){
                 const args = getSettingsFromForm();
                 //ipcRenderer.sendSync('submit-race',args);
-
                 ipcRenderer.invoke('submit-race', args).then( result => {
                     if( result===1 ) {
-                        ipcRenderer.send('start-prerace', {group: 0});
+                        ipcRenderer.send('start-prerace', {group: 0} );
                     }
                 });
             },
@@ -596,6 +607,7 @@ window.setup = window.setup || {}, // откуда я это взял? как э
 
                 $(function() {  // on ready
                     ipcRenderer.invoke('get-progress').then( result  => {
+                        showPilotsAll(settings.groups);
                         showMenu( settings, result.inCompetition, result.raceLoop, result.groupCur, result.rulesName);
                     });
                 });

@@ -382,8 +382,13 @@ ipcMain.handle( 'parse-xls', async (event, arg)=> {
     const ws = wb.Sheets[first_sheet_name];
     const pilotsObj =  XLSX.utils.sheet_to_json(ws, {defval: false});
     let pilots = parseXLS(pilotsObj, global.settings.rules);
+    if( pilots === false ) { // не валидное кол-во пилотов для данных правил
+        dialog.showErrorBox('Ошибка', 'Количество пилотов не соответствует выбранным правилам');
+        return false;
+    }
+    global.settings.pilots = pilots;
     global.settings.groups = preparePilotsGroups(pilots, global.settings.rules);
-    global.settings.pilots = addJudges(pilots, global.settings.rules);
+    //global.settings.pilots = addJudges(pilots, global.settings.rules);
     store.set('pilots', global.settings.pilots);
     return global.settings.groups;
 });
@@ -394,7 +399,7 @@ ipcMain.handle( 'repackGroups', async (event, arg) =>{
         return false;
     }
     global.settings.groups = preparePilotsGroups(global.settings.pilots, arg);
-    global.settings.pilots = addJudges(global.settings.pilots, arg);
+    //global.settings.pilots = addJudges(global.settings.pilots, arg);
     store.set('pilots', global.settings.pilots);
     return global.settings.groups;
 });
@@ -483,6 +488,13 @@ ipcMain.handle( 'save-settings', async (event, arg)=> {
     dialog.showMessageBoxSync({ 'message': 'Сохранено', 'type':'info'});
     return 1;
 });
+
+ipcMain.on( 'save-rules', (event, arg)=> {
+    global.settings.rules=arg;
+    store.set('rules', arg);
+    return 1;
+});
+
 
 /*
 Приглашение пилотов
@@ -576,12 +588,14 @@ ipcMain.on( 'get-results',  ( event, arg )=> {
     // изучить - https://ru.stackoverflow.com/questions/412715/%D0%97%D0%B0%D0%BF%D1%83%D1%81%D0%BA-%D1%84%D1%83%D0%BD%D0%BA%D1%86%D0%B8%D0%B8-%D0%BF%D0%BE-%D0%B7%D0%BD%D0%B0%D1%87%D0%B5%D0%BD%D0%B8%D1%8E-%D0%BF%D0%B5%D1%80%D0%B5%D0%BC%D0%B5%D0%BD%D0%BD%D0%BE%D0%B9
 });
 
-function parseXLS(xlsjson, rules  )
+function parseXLS( xlsjson, rules_num  )
 {
     let loop =0;
     let curLoop;
     let result = [];
     let fSetPos = 0;
+    if( xlsjson.length<rules[rules_num].minPilots || xlsjson.length>rules[rules_num].maxPilots) return false;
+
     xlsjson.forEach( function ( pilot, i ) {
         let p=0;
         let pos, time, laps;
@@ -613,8 +627,8 @@ function parseXLS(xlsjson, rules  )
     });
 
 
-    if( rulesFunc[ rules ].fFindRace !== undefined ) {
-        let pos = rulesFunc[ rules].fFindRace(result);
+    if( rulesFunc[ rules_num ].fFindRace !== undefined ) {
+        let pos = rulesFunc[ rules_num ].fFindRace(result);
         raceLoop = pos.loop;
         groupCur = pos.group;
     }
@@ -1079,6 +1093,7 @@ function preparePilotsGroups(pilotsObj, rulesNum) {
 }
 
 // Назначить судей
+/*todo доработать*/
 function addJudges(pilotsObj, rulesNum) {
     if (rulesFunc[rulesNum].fJudges !== undefined) return rulesFunc[rulesNum].fJudges(pilotsObj);
     else {
@@ -1111,7 +1126,7 @@ const sendOsc = function (addr, arg1) {
 Отправить имя пилота в TVP
  */
 const sendPilotName = function (camid, name) {
-    sendOsc('/v1/camera/' + camid + '/label', name);
+    sendOsc('/v1/camera/' + camid + '/label', name.toString());
 };
 
 const onCamera = function (camid) {
