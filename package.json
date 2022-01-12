@@ -1,6 +1,6 @@
 {
   "name": "whooprace.app",
-  "version": "0.0.9",
+  "version": "0.0.10",
   "main": "main.js",
   "devDependencies": {
     "electron": "^16.0.2"

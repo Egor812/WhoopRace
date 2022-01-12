@@ -39,52 +39,62 @@ function showMenu(settings, inCompetition, raceLoop, groupCur, rulesName) {
 /*
 Страница приглашения пилотов
  */
-function prerace(group=0, round = 0, showNext= 1, wawGroup = 1) {
+function prerace(data) {
 
     elmRace.show();
     elmMenu.hide();
     elmResults.hide();
     elmRerace.hide();
-    if( showNext ) elmPagination.show();
-    else elmPagination.hide();
     elmStartNow.show();
 
-    let groups = settings.groups;
-    //let prepareTimer = settings.prepareTimer;
-    //let raceTimer = settings.raceTimer;
-    const raceLoops = settings.raceLoops;
-    let groupThis = group;
-    let groupMax = groups.length; // max index+1
-    let groupNext;
+    console.log( data );
+    //let groups = settings.groups;
+    ////let prepareTimer = settings.prepareTimer;
+    ////let raceTimer = settings.raceTimer;
+    //const raceLoops = settings.raceLoops;
+    //let groupThis = group;
+    //let groupMax = groups.length; // max index+1
+    //let groupNext;
 
     const elmPilots = [];
-    const elmPilotsNext=[];
+    const elmPilotsNext = [];
     const htmlGroup = document.getElementById('group');
     const htmlRound = document.getElementById('round');
+    const htmlRoundName = document.getElementById('round-name');
 
     $('.group-pilots-results').hide();
 
-    htmlGroup.innerHTML= `Группа ${(groupThis+1)}`;
-    htmlRound.innerHTML= `Раунд ${(round+1)}/${raceLoops}`;
+    htmlGroup.innerHTML= `Группа ${(data.groupCur+1)}`;
+    if( !data.showGroup ) htmlGroup.style.display='none';
+    else htmlGroup.style.display='inline-block';
+
+    htmlRound.innerHTML= `Раунд ${(data.loop+1)}/${data.maxLoops}`;
+    if( data.raceName !=='') {
+        htmlRoundName.innerHTML = data.raceName;
+        htmlRoundName.style.display='inline-block';
+    }
+    else {
+        htmlRoundName.style.display='none';
+    }
+
     for( let i=0; i<4; i++ ){
         elmPilots[i] = $('#pilot-'+(i+1)+' .name');
-        if( i<groups[groupThis].length ) {
+        if( i<data.group.length ) {
             $('#pilot-'+(i+1)).show();
-            elmPilots[i].text(groups[groupThis][i]['Name']);
-            $('#pilot-' + (i + 1) + ' > .ch').text(groups[groupThis][i]['Channel']);
+            elmPilots[i].text( data.group[i].name );
+            $('#pilot-' + (i + 1) + ' > .ch').text( data.group[i].channel );
+            $('#pilot-' + (i + 1) + ' > .stat').text( data.group[i].resultTxt );
             //if (settings.judges) $('#pilot-' + (i + 1) + ' > .judge').text(groups[groupThis][i]['Judges']);
         }
         else $('#pilot-'+(i+1)).hide();
     }
 
-    groupNext = groupThis + 1;
-    if (groupNext >= groupMax) groupNext = 0;
-    if( showNext ) {
+    if( data.groupNext !== undefined ) {
         for( let i=0; i<4; i++ ){
             elmPilotsNext[i] = $('#pilot-next-'+(i+1));
-            if( i<groups[groupNext].length ) {
+            if( i<data.groupNext.length ) {
                 elmPilotsNext[i].show();
-                elmPilotsNext[i].text(groups[groupNext][i]['Name']);
+                elmPilotsNext[i].text( data.groupNext[i].name );
             }
             else elmPilotsNext[i].hide();
         }
@@ -92,7 +102,6 @@ function prerace(group=0, round = 0, showNext= 1, wawGroup = 1) {
     }
     else{
         $('#group-next').hide();
-
     }
 
     //clockElm = document.getElementById('prepare-timer');
@@ -101,22 +110,30 @@ function prerace(group=0, round = 0, showNext= 1, wawGroup = 1) {
     switchToPreraceTimer();
 
     let pagination='';
-    let sel;
-    pagination += '<button data-page="'+String(groupThis-1)+'" type="button" class="btn btn-outline-primary pagination-group">&laquo;</button>';
-    for( let i=0; i<groups.length; i++) {
-        if( i===groupThis) sel='btn-primary'; else sel='btn-outline-primary';
-        pagination += '<button data-page="'+i+'" type="button" class="btn '+sel+' pagination-group">'+ (i+1) +'</button>';
+    if( data.showNext) {
+        elmPagination.show();
+        let sel;
+        pagination += '<button data-page="' + String(data.groupCur - 1) + '" type="button" class="btn btn-outline-primary pagination-group">&laquo;</button>';
+        for (let i = 0; i < data.groupsQty; i++) {
+            if (i === data.groupCur) sel = 'btn-primary'; else sel = 'btn-outline-primary';
+            pagination += '<button data-page="' + i + '" type="button" class="btn ' + sel + ' pagination-group">' + (i + 1) + '</button>';
+        }
+        if (data.groupNext !== undefined) {
+            pagination += '<button data-page="' + data.groupNext + '" type="button" class="btn btn-outline-primary pagination-group">&raquo;</button>';
+        }
+        pagination += '</div>';
     }
-    pagination += '<button data-page="'+groupNext+'" type="button" class="btn btn-outline-primary pagination-group">&raquo;</button>';
-    pagination += '</div>';
+    else{
+        elmPagination.hide();
+    }
     elmPagination.html(pagination);
 
-    $("#rerace").data('group', groupThis );
+    $("#rerace").data('group', data.groupCur );
 
-    if( wawGroup ){
+    if( data.wawGroup ){
         let audio = document.getElementById('wav-invite');
         audio.addEventListener('ended', () => {
-            setTimeout(() => {  document.getElementById('wav-' + (groupThis + 1)).play(); }, 250);
+            setTimeout(() => {  document.getElementById('wav-' + (data.groupCur + 1)).play(); }, 250);
         }, { once: true });
         audio.play();
     }
@@ -202,6 +219,7 @@ function showResults(data, loop) {
     elmRace.hide();
     elmMenu.hide();
     elmResults.show();
+    let width=0; // for screenshot
 
     if( data === false) {
         document.getElementById('result-round').innerHTML= 'Гонка завершена';
@@ -214,7 +232,9 @@ function showResults(data, loop) {
     let x='';
     data.forEach( function(pilot) {
         x += '<span class="setup-pilots-badge badge badge-warning" style="width:120px; margin-right:30px">' + pilot.Name + '</span>';
-        for(let i = 0; i < pilot.Results.length; i++){
+        let len = pilot.Results.length;
+        if( len>width ) width = len;
+        for(let i = 0; i < len; i++){
             x += '<span class="result-table-intermediate">';
             if( pilot.Results[i] !== undefined) {
                 if (pilot.Results[i].laps !== false) x += '<span class="result-cell" style="width: 20px;">' + pilot.Results[i].laps + '</span>';
@@ -230,10 +250,11 @@ function showResults(data, loop) {
         }
         x +='<br>';
     });
-
     x += '<span id="resultsTimer" style="text-align: right; width: 100%; display: inline-block; margin-top: 10px">...</span>';
-
     HTMLOUT.innerHTML = x;
+
+    width = 155 + width*120 + 20;
+    $( "#results-screenshot" ).data( "width", width );
 }
 
 // Вывести группы пилотов в меню
@@ -363,7 +384,7 @@ ipcRenderer.on('show-race', (event, arg)=> {
 });
 
 ipcRenderer.on('show-prerace', (event, arg)=> {
-    prerace(arg['group'], arg['round'], arg['showNext'], arg['wavGroup']);
+    prerace(arg['data']);
 });
 
 ipcRenderer.on('open-dialog-paths-selected', (event, arg)=> {
@@ -508,6 +529,11 @@ window.setup = window.setup || {}, // откуда я это взял? как э
                 ipcRenderer.send('pause-results');
             },
 
+            takeScreenshot: function() {
+                let elmResults = $('#results');
+                ipcRenderer.send('screenshot-results', {x:100, y:50, width : $('#results-screenshot').data('width'), height: elmResults.height() });
+            },
+
             // экспорт результатов в XLS
             exportXLS: function() {
                 ipcRenderer.send('export-xls');
@@ -592,6 +618,11 @@ window.setup = window.setup || {}, // откуда я это взял? как э
                         }
                     }
                 });
+
+                $('#results-screenshot').click( function () {
+                    setup.handler.takeScreenshot();
+                });
+
                 // основное меню - смена правил
                 $( "#rulesSelector" ).change( function() {
                     ipcRenderer.invoke('repackGroups', getFormRulesVal() ).then( (result) => {

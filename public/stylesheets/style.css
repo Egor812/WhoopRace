@@ -11,6 +11,7 @@ a {
 #menu{
   padding: 50px;
   margin: 10px  250px;
+  background: black;
 }
 
 #race{
@@ -46,6 +47,16 @@ a {
 
 .pilots > .judge{
   margin:3px;
+}
+
+.pilots > .stat{
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  font-size: medium;
+  padding-right: 8px;
+  margin-bottom: 6px;
+  color: lightslategray;
 }
 
 .top {

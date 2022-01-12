@@ -25,6 +25,10 @@
   <audio id="wav-20secondstogo" src="./data/20secondstogo.wav" preload="auto"></audio>
 </div>
 
+<div id="logo" style="position:fixed; right:15px; bottom: 0; font-weight: 700; font-size: 4rem;">
+  <span style="color:red">FIX</span><span style="color:white">FLY.RU</span>
+</div>
+
 <div id="menu">
   <h1>Whoop Race</h1>
 
@@ -167,47 +171,12 @@
 
     <div id="help" style="padding-top: 3em;">
       <div id="showBestChannels">
-        <a href="#" onclick="$('#showBestChannels > div.row').toggle()">Наилучшие сочетания каналов</a>
+        <a href="#" onclick="$('#showBestChannels > div.row').toggle()">Наилучшие сочетания каналов Raceband</a>
         <div class="row helptable" style="display: none; width:20em;">
           <div class="col">1</div>
           <div class="col">2</div>
-          <div class="col">5</div>
-          <div class="col">6</div>
-          <div class="w-100"></div>
-          <div class="col">1</div>
-          <div class="col">2</div>
-          <div class="col">6</div>
-          <div class="col">7</div>
-          <div class="w-100"></div>
-          <div class="col">1</div>
-          <div class="col">2</div>
-          <div class="col">7</div>
-          <div class="col">8</div>
-          <div class="w-100"></div>
-          <div class="col">1</div>
-          <div class="col">3</div>
-          <div class="col">6</div>
-          <div class="col">8</div>
-          <div class="w-100"></div>
-          <div class="col">1</div>
           <div class="col">4</div>
           <div class="col">5</div>
-          <div class="col">6</div>
-          <div class="w-100"></div>
-          <div class="col">2</div>
-          <div class="col">3</div>
-          <div class="col">6</div>
-          <div class="col">7</div>
-          <div class="w-100"></div>
-          <div class="col">2</div>
-          <div class="col">3</div>
-          <div class="col">7</div>
-          <div class="col">8</div>
-          <div class="w-100"></div>
-          <div class="col">3</div>
-          <div class="col">4</div>
-          <div class="col">7</div>
-          <div class="col">8</div>
           <div class="w-100"></div>
           <br>
         </div>
@@ -252,6 +221,7 @@
 <div id="race" style="display: none">
     <div id="group" class="badge badge-info" style="font-size: 1.5em;text-align: right;margin-bottom: 0;"> </div>
     <div id="round" class="badge badge-secondary" style="font-size: 1.5em;text-align: right;margin-bottom: 0;"> </div>
+    <div id="round-name" class="badge badge-secondary" style="font-size: 1.5em;margin-bottom: 0; margin-top: 4px;display:none"> </div>
     <div id="group-pilots" class="row">
         <div id="pilot-1" class="pilots col">
           <span class='name'></span>
@@ -261,6 +231,7 @@
             <input type="text" class="form-control group-pilots-time" id="gpt-1" title="время" style="width: 100px; display:inline;" value="0">
           </span>
           <span class="ch top badge badge-pill badge-warning"></span>
+          <span class="stat"></span>
           <span class="judge bottom"></span>
         </div>
         <div id="pilot-2" class="pilots col">
@@ -271,6 +242,7 @@
             <input type="text" class="form-control group-pilots-time" id="gpt-2" title="время" style="width: 100px; display:inline;" value="0">
           </span>
           <span class="ch top badge badge-pill badge-warning"></span>
+          <span class="stat"></span>
           <span class="judge bottom"></span>
         </div>
         <div class="w-100"></div>
@@ -282,6 +254,7 @@
             <input type="text" class="form-control group-pilots-time" id="gpt-3" title="время" style="width: 100px; display:inline;" value="0">
           </span>
           <span class="ch top badge badge-pill badge-warning"></span>
+          <span class="stat"></span>
           <span class="judge bottom"></span>
         </div>
         <div id="pilot-4" class="pilots col">
@@ -292,6 +265,7 @@
             <input type="text" class="form-control group-pilots-time" id="gpt-4" title="время" style="width: 100px; display:inline;" value="0">
           </span>
           <span class="ch top badge badge-pill badge-warning"></span>
+          <span class="stat"></span>
           <span class="judge bottom"></span>
         </div>
     </div>
@@ -324,6 +298,7 @@
   <div id="result-round" class="badge badge-secondary" style="font-size: 1.5em;margin-bottom: 0;"> </div>
   <div id="result-table" style="margin-top: 30px"></div>
   <div id='close-stat' style="position:absolute; top:0; right:0; cursor:pointer">X</div>
+  <button type="button" id="results-screenshot" class="btn btn-outline-primary" style="position:absolute; bottom:5px; left:5px;">Скрин</button>
 </div>
 
 

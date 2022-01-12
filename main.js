@@ -3,6 +3,9 @@
 const isDev = process.env.APP_DEV ? (process.env.APP_DEV.trim() === "true") : false;
 
 global.settings = {};
+//global.settings.pilots[n] { Num, Name, Channel, Group, Results[m]{pos, time, laps }
+//global.settings.groups[group][n] { Num, Name, Channel, ... }
+
 let timerCur; // текущее значение таймера
 let groupCur; // текущая группа пилотов
 let timeInterval; // таймер race и prerace
@@ -114,8 +117,8 @@ const rules =[
         minPilots: 8,
         maxPilots: 8,
         loops: 6,
-        groups: 1,
-        showNext: 0,
+        groups: 1,  // одна рабочая группа, в которой каждый раунд меняем пилотов
+        showNext: 0, // не знаем пилотов - нечего показывать
         wavNextNum: 0,
         lapsLimit: 1
     },
@@ -144,6 +147,7 @@ rulesFunc[5] = {
 };
 rulesFunc[4] ={
     fRaceNext: seedDE8group,    // создать группу для вылета
+    fRaceName: nameDE8, // название вылета
     fGroupsOnLoad: seedDE8groupsOnLoad, // создать группы для вывода на экран загрузки
     fFinalPos: posDE8,      // подвести результаты
     fJudges: setJudgesDE8,   // назначить судей
@@ -540,6 +544,11 @@ ipcMain.on( 'pause-results',  ()=> {
     return 1
 });
 
+ipcMain.on( 'screenshot-results',  (event, arg)=> {
+    takeScreenshot(arg.x, arg.y, arg.width, arg.height);
+    return 1;
+});
+
 
 /*
 Получить результаты для статистики вызванной из меню
@@ -587,6 +596,52 @@ ipcMain.on( 'get-results',  ( event, arg )=> {
     nextRace(); // хотел передать имя этой функции сюда как текстовый аргумент, но не получилось вызвать функцию
     // изучить - https://ru.stackoverflow.com/questions/412715/%D0%97%D0%B0%D0%BF%D1%83%D1%81%D0%BA-%D1%84%D1%83%D0%BD%D0%BA%D1%86%D0%B8%D0%B8-%D0%BF%D0%BE-%D0%B7%D0%BD%D0%B0%D1%87%D0%B5%D0%BD%D0%B8%D1%8E-%D0%BF%D0%B5%D1%80%D0%B5%D0%BC%D0%B5%D0%BD%D0%BD%D0%BE%D0%B9
 });
+
+function takeScreenshot( x, y, width, height) {
+    mainWindow.webContents
+        .capturePage({
+            x: x,
+            y: y,
+            width: width,
+            height: height,
+        })
+        .then((img) => {
+            dialog
+                .showSaveDialog({
+                    title: "Select the File Path to save",
+                    defaultPath: '~/results.jpg',
+                    buttonLabel: "Save",
+                    filters: [
+                        {
+                            name: "Image Files",
+                            extensions: ["jpg"],
+                        },
+                    ],
+                    properties: [],
+                })
+                .then((file) => {
+                    // Stating whether dialog operation was
+                    // cancelled or not.
+                    console.log(file.canceled);
+                    if (!file.canceled) {
+                        let fs = require('fs');
+                        console.log(file.filePath.toString());
+                        fs.writeFile(file.filePath.toString(),
+                            img.toJPEG(80), "base64", function (err) {
+                                if (err) throw err;
+                                console.log("Saved!");
+                            });
+                    }
+                })
+                .catch((err) => {
+                    console.log(err);
+                });
+        })
+        .catch((err) => {
+            console.log(err);
+        });
+
+}
 
 function parseXLS( xlsjson, rules_num  )
 {
@@ -807,7 +862,7 @@ function finishRace(stat = null)
             pausePrerace();
             initializeClock('prepare-timer', 2, saveRaceReq);
         } // автопауза для заполнения таблицы результатов
-        else initializeClock('prepare-timer', 5, saveRaceReq); // пауза для проверки результатов
+        else initializeClock('prepare-timer', 7, saveRaceReq); // пауза для проверки результатов
     }
     else nextRace();
     console.log( 'finishRace is completed');
@@ -868,6 +923,11 @@ function findPilotInGroup(group, loop, place) {
     }
     console.error('ERROR findPilotInGroup: не найден G:',group,'L:',loop, 'P:', place  );
     return false;
+}
+
+function nameDE8(race) {
+    const names = [ 'Группа 1', 'Группа 2', 'За 7 и 8 место', 'За выход в финал', 'За выход в финал, 5 и 6 место', 'Финал'];
+    return names[race];
 }
 
 
@@ -993,7 +1053,7 @@ function nextRace() {
                 startPrerace();
             }
             else {
-                initializeClock('prepare-timer', 5, startPrerace);
+                initializeClock('prepare-timer', 10, startPrerace);
                 showIntermediateResults( global.settings.pilots, global.settings.rules );
             }
         }
@@ -1018,12 +1078,85 @@ function showFinalResults( pilots, rules ) {
     mainWindow.webContents.send('show-results', { results : res, round : raceLoop });
 }
 
+function preparePreraceData() {
+    let data = {
+        group: [],
+    };
+
+    data.groupCur = groupCur;
+    if( rules[ global.settings.rules ].groups===1 &&  rules[ global.settings.rules ].showNext===0) data.showGroup=0;
+    else data.showGroup=1;
+    data.loop = raceLoop;
+    data.maxLoops = global.settings.raceLoops;
+    if( rulesFunc[ global.settings.rules ].fRaceName !== undefined)  {
+        data.raceName = rulesFunc[ global.settings.rules ].fRaceName(raceLoop);
+    }
+    else data.raceName ='';
+
+
+    for( let i=0; i<global.settings.groups[groupCur].length; i++ ){
+        data.group[i] = {};
+        data.group[i].name = global.settings.groups[groupCur][i]['Name'];
+        data.group[i].channel = global.settings.groups[groupCur][i]['Channel'];
+        data.group[i].resultTxt = '';
+        console.log( rules[ global.settings.rules ].saveLaps );
+        if( rules[ global.settings.rules ].saveLaps ) {
+            let pilot = global.settings.pilots[global.settings.groups[groupCur][i]['Num']];
+            let results = [];
+            let sum=0;
+            for( let j = 0; j < raceLoop; j++) {
+                if (pilot.Results[j] !== undefined && pilot.Results[j] !== null) {
+                    //data.group[i].results.push(pilot.Results[j].laps);
+                    results.push(pilot.Results[j].laps);
+                    sum += pilot.Results[j].laps;
+                }
+                if( results.length>0) {
+                    data.group[i].resultTxt = results.join('-');
+                    data.group[i].resultTxt += ' : ' + sum + 'к';
+                }
+            }
+        }
+        else if( rules[ global.settings.rules ].savePlace ){
+            let pilot = global.settings.pilots[global.settings.groups[groupCur][i]['Num']];
+            let results = [];
+            for( let j = 0; j < raceLoop; j++) {
+                if (pilot.Results[j] !== undefined && pilot.Results[j] !== null) {
+                    results.push(pilot.Results[j].pos);
+                }
+                if( results.length>0) {
+                    data.group[i].resultTxt = results.join('-');
+                    data.group[i].resultTxt = 'м ' + data.group[i].resultTxt;
+                }
+            }
+
+        }
+    }
+
+    let groupNext = groupCur + 1;
+    let groupMax = global.settings.groups.length;
+    if( groupNext >= groupMax ) groupNext = 0;
+    data.showNext = rules[ global.settings.rules ].showNext;
+    if( rules[ global.settings.rules ].showNext ) {
+        data.groupNext = [];
+        for( let i=0; i<global.settings.groups[groupNext].length; i++ ){
+            data.groupNext[i] = {};
+            data.groupNext[i].name = global.settings.groups[groupNext][i]['Name'];
+        }
+    }
+
+    data.groupsQty = global.settings.groups.length;
+    data.wawGroup = rules[ global.settings.rules ].wavNextNum;
+
+    return data;
+}
+
 function startPrerace(){
     inRace = 0;
     pause = 0;
 
+
     clearInterval(timeInterval);
-    mainWindow.webContents.send('show-prerace', { group : groupCur, round : raceLoop, showNext : rules[ global.settings.rules ].showNext, wavGroup : rules[ global.settings.rules ].wavNextNum });
+    mainWindow.webContents.send('show-prerace', { data: preparePreraceData() });
 
     if( global.settings.obsUse ) {
         changeSceneObs( global.settings.obsSceneWR);
@@ -1307,19 +1440,22 @@ function prepareResultsForRender(pilots, rules_num, final =0) {
         ret[i].Name = pilot.Name;
         ret[i].Results = [];
         if( final ) ret[i].Sums = { pos:0, laps:0, time:0 };
+        ret[i].Sums = { pos:0, laps:0, time:0 };
         for(let j = 0; j < raceLoop; j++){
             ret[i].Results[j] = { pos:false, laps:false, time:false };
             if( pilot.Results[j] !== undefined && pilot.Results[j] !== null ) {
                 if (rules[rules_num].savePlace) ret[i].Results[j].pos = pilot.Results[j].pos;
                 if (rules[rules_num].saveTime) ret[i].Results[j].time = pilot.Results[j].time;
                 if (rules[rules_num].saveLaps) ret[i].Results[j].laps = pilot.Results[j].laps;
-                if( final ){
+                if( final )
+                {
                     ret[i].Sums.pos += pilot.Results[j].pos;
                     ret[i].Sums.time += pilot.Results[j].time;
                     ret[i].Sums.laps += pilot.Results[j].laps;
                 }
             }
         }
+
     });
 
     if( final ) {
