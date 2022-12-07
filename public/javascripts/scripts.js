@@ -7,6 +7,7 @@ const elmMenu = $('#menu');
 const elmResults = $('#results');
 const elmRerace = $('#rerace');
 const elmStartNow = $('#start-now');
+const contextMenu = 0;
 
 function showMenu(settings, inCompetition, raceLoop, groupCur, rulesName) {
     setSettings(settings);
@@ -83,7 +84,8 @@ function prerace(data) {
             $('#pilot-'+(i+1)).show();
             elmPilots[i].text( data.group[i].name );
             $('#pilot-' + (i + 1) + ' > .ch').text( data.group[i].channel );
-            $('#pilot-' + (i + 1) + ' > .stat').text( data.group[i].resultTxt );
+            $('#pilot-' + (i + 1) + ' > .stat').text( data.group[i].resultTxt[0] );
+            $('#pilot-' + (i + 1) + ' > .place').text( data.group[i].resultTxt[1] );
             //if (settings.judges) $('#pilot-' + (i + 1) + ' > .judge').text(groups[groupThis][i]['Judges']);
         }
         else $('#pilot-'+(i+1)).hide();
@@ -144,11 +146,11 @@ function prerace(data) {
 
 }
 
-function switchToRaceTimer()
+function switchToRaceTimer(raceTimer)
 {
     clockPrepareElm.hide();
     clockElm = clockRaceElm;
-    clockElm.text(settings.raceTimer);
+    clockElm.text(raceTimer);
     clockElm.show();
 }
 
@@ -166,11 +168,11 @@ function switchToResultsTimer() {
     clockElm = $('#resultsTimer');
 }
 
-function race(rules, win32)
+function race(rules, win32, raceTimer, withoutTVP)
 {
     elmStartNow.hide();
-    switchToRaceTimer();
-    if( settings.withoutTVP ) {
+    switchToRaceTimer(raceTimer);
+    if( withoutTVP ) {
         for( let i=0; i<4; i++) {
             $('#gpp-' + (i+1)).val(0);
             $('#gpl-' + (i+1)).val(0);
@@ -214,7 +216,7 @@ function results(data, rules)
 }
 
 // data[][ Results[laps pos time], Sums[pos ] ]
-function showResults(data, loop) {
+function showResults(data, loop, raceLoops) {
     console.log(data);
     elmRace.hide();
     elmMenu.hide();
@@ -226,12 +228,12 @@ function showResults(data, loop) {
         return;
     }
 
-    document.getElementById('result-round').innerHTML= `Раунд ${(loop)}/${settings.raceLoops}`;
+    document.getElementById('result-round').innerHTML= `Раунд ${(loop)}/${raceLoops}`;
 
     const HTMLOUT = document.getElementById('result-table');
     let x='';
     data.forEach( function(pilot) {
-        x += '<span class="setup-pilots-badge badge badge-warning" style="width:120px; margin-right:30px">' + pilot.Name + '</span>';
+        x += '<span class="results-pilots-badge badge badge-warning" style="width:120px; margin-right:30px">' + pilot.Name + '</span>';
         let len = pilot.Results.length;
         if( len>width ) width = len;
         for(let i = 0; i < len; i++){
@@ -259,7 +261,8 @@ function showResults(data, loop) {
 
 // Вывести группы пилотов в меню
 // pilotsG[][][Name, Channel, ]
-function showPilotsAll(pilotsG) {
+function showPilotsAll(pilotsG, channels) {
+    console.log( pilotsG );
     if( pilotsG === undefined || pilotsG === false ) return;
     const HTMLOUT = document.getElementById('list-pilots');
     let x='';
@@ -267,7 +270,7 @@ function showPilotsAll(pilotsG) {
     for (let group = 0; group < pilotsG.length; group++) {
         x += '<p> Группа ' + (group+1) + ':';
         for (let ii = 0; ii < pilotsG[group].length; ii++) {
-            x += '<span class="setup-pilots-badge badge badge-warning">' + pilotsG[group][ii]['Name'] + ' <sup>'+ pilotsG[group][ii]['Channel'] +'</sup></span>';
+            x += '<span style="display: inline-block;"><span class="setup-pilots-badge badge badge-warning" data-id="' + pilotsG[group][ii]['Num'] + '">' + pilotsG[group][ii]['Name'] + ' <sup>'+ channels[ii] +'</sup></span></span>';
             num++;
         }
         x += '</p>';
@@ -311,6 +314,11 @@ function setSettings(settings) {
     $('#inputRaceTime').val(settings.raceTimer);
     $('#inputRaceLaps').val(settings.raceLaps);
     $('#inputLoops').val(settings.raceLoops);
+    $('#inputCh1').val(settings.channels[0]);
+    $('#inputCh2').val(settings.channels[1]);
+    $('#inputCh3').val(settings.channels[2]);
+    $('#inputCh4').val(settings.channels[3]);
+
 }
 
 /*
@@ -331,8 +339,10 @@ function getSettingsFromForm(){
     let obsSceneTVP = $('#obsSceneTVP').val();
     let obsSceneWR = $('#obsSceneWR').val();
     let obsSceneBreak = $('#obsSceneBreak').val();
+    let channels = [ $('#inputCh1').val(), $('#inputCh2').val(), $('#inputCh3').val(), $('#inputCh4').val() ];
     return {judges: judges, withoutTVP: withoutTVP, prepareTimer: prepareTimer, raceTimer : raceTimer, raceLoops: raceLoops, rules: rules,
-        obsUse:obsUse, obsPort:obsPort, obsSceneTVP:obsSceneTVP, obsSceneWR:obsSceneWR, obsSceneBreak:obsSceneBreak, obsPassword:obsPassword, raceLaps:raceLaps};
+        obsUse:obsUse, obsPort:obsPort, obsSceneTVP:obsSceneTVP, obsSceneWR:obsSceneWR, obsSceneBreak:obsSceneBreak, obsPassword:obsPassword,
+        raceLaps:raceLaps, channels: channels};
 }
 
 function getRulesFromForm() {
@@ -360,7 +370,7 @@ function getResultsFromForm() {
 const { ipcRenderer } = require('electron');
 //const settings = require('electron').remote.getGlobal( "settings" );
 //const { BrowserWindow } = require('@electron/remote');
-const settings = require('@electron/remote').getGlobal( "settings" );
+//const settings = require('@electron/remote').getGlobal( "settings" );
 
 ipcRenderer.on('timer-value', (event, arg)=> {
     clockElm.text(arg);
@@ -370,8 +380,8 @@ ipcRenderer.on('20togo', ()=> {
     document.getElementById('wav-20secondstogo').play();
 });
 
-ipcRenderer.on('finish', ()=> {
-    if( settings.withoutTVP ) document.getElementById('wav-finish').play();
+ipcRenderer.on('finish', (event,arg)=> {
+    if( arg.withoutTVP ) document.getElementById('wav-finish').play();
 });
 
 ipcRenderer.on('editresults', (event, arg)=> {
@@ -380,7 +390,7 @@ ipcRenderer.on('editresults', (event, arg)=> {
 
 
 ipcRenderer.on('show-race', (event, arg)=> {
-    race( arg['rules'], arg['win32'] );
+    race( arg['rules'], arg['win32'], arg['raceTimer'], arg['withoutTVP'] );
 });
 
 ipcRenderer.on('show-prerace', (event, arg)=> {
@@ -395,7 +405,7 @@ ipcRenderer.on('open-dialog-paths-selected', (event, arg)=> {
     //setup.handler.outputSelectedPathsFromOpenDialog(arg); //?
     // запрос с промисом
     ipcRenderer.invoke('parse-xls', arg).then( result => {
-        showPilotsAll(result);
+        showPilotsAll(result.groups, result.channels);
         $('menu-this-race').hide();
         /*ipcRenderer.invoke('get-progress').then( result  => {
             showMenu( settings, result.raceLoop, result.groupCur, result.rulesName);
@@ -409,7 +419,7 @@ ipcRenderer.on('query-results', ()=> {
 });
 
 ipcRenderer.on('show-results', (event, arg)=> {
-    showResults( arg['results'], arg['round'] );
+    showResults( arg['results'], arg['round'], arg['raceLoops'] );
     switchToResultsTimer();
 });
 
@@ -447,7 +457,7 @@ window.setup = window.setup || {}, // откуда я это взял? как э
             obsCheckConnection: function()
             {
                 ipcRenderer.invoke('obsCheckConnection', { port: Number($('#obsPort').val()), pass:$('#obsPassword').val() } )
-                    .then( result => { /*if ( result===1 ) alert('OK'); else alert('Error');*/});
+                    .then();
             },
 
             saveSettings: function(){
@@ -473,7 +483,7 @@ window.setup = window.setup || {}, // откуда я это взял? как э
                 ipcRenderer.invoke('suspend-race').then( () => {
                     ipcRenderer.invoke('get-progress').then( result  => {
                         $('menu-this-race').show();
-                        showMenu( settings, result.inCompetition, result.raceLoop, result.groupCur, result.rulesName);
+                        showMenu( result.settings, result.inCompetition, result.raceLoop, result.groupCur, result.rulesName);
                     });
                 });
             },
@@ -496,7 +506,7 @@ window.setup = window.setup || {}, // откуда я это взял? как э
             terminateRace: function(){
                 ipcRenderer.send('terminate-race');
                 ipcRenderer.invoke('get-progress').then( result  => {
-                    showMenu(settings, result.inCompetition, result.raceLoop, result.groupCur, result.rulesName);
+                    showMenu(result.settings, result.inCompetition, result.raceLoop, result.groupCur, result.rulesName);
                 });
             },
 
@@ -552,6 +562,22 @@ window.setup = window.setup || {}, // откуда я это взял? как э
                 });
             },
 
+            pilotMenu: function( elm ) {
+                let id = $(elm).data('id');
+                if( contextMenu) {
+                    $('.pilot-menu').remove();
+                }
+                //get menu from main
+                ipcRenderer.invoke('get-pilot-context-menu', {id:id}).then( result  => {
+                    //todo сделать
+                    //let html = showPilotContextMenu( result );
+                    $(elm).after('<span class="pilot-menu list-group" style="position:absolute;z-index:10;">' +
+                        html +
+                        '   <a href="#" class="list-group-item list-group-item-action context-menu-item">A second link item</a>'+
+                        '</span>');
+                });
+            },
+
             //EVENTS
             init: function() {
                 $('#showOpendialog').click( function () {
@@ -600,6 +626,9 @@ window.setup = window.setup || {}, // откуда я это взял? как э
                 elmStartNow.click( function () {
                     setup.handler.startNow();
                 });
+                $('#list-pilots').on('click', '.setup-pilots-badge', function () {
+                    setup.handler.pilotMenu(this);
+                });
 
                 addEventListener("keyup", function(event) {
                     if (event.code === 'KeyQ') {
@@ -627,7 +656,7 @@ window.setup = window.setup || {}, // откуда я это взял? как э
                 $( "#rulesSelector" ).change( function() {
                     ipcRenderer.invoke('repackGroups', getFormRulesVal() ).then( (result) => {
                         console.log(result);
-                        if( result!==false) showPilotsAll(result);
+                        if( result!==false) showPilotsAll(result.groups, result.channels);
                     });
                     rulesChangeRender();
                 });
@@ -638,12 +667,13 @@ window.setup = window.setup || {}, // откуда я это взял? как э
 
                 $(function() {  // on ready
                     ipcRenderer.invoke('get-progress').then( result  => {
-                        showPilotsAll(settings.groups);
-                        showMenu( settings, result.inCompetition, result.raceLoop, result.groupCur, result.rulesName);
+                        showPilotsAll(result.groups, result.settings.channels);
+                        showMenu( result.settings, result.inCompetition, result.raceLoop, result.groupCur, result.rulesName);
                     });
                 });
 
             }
+
         };
 
 

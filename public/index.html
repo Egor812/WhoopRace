@@ -99,6 +99,22 @@
       <label for="inputLoops" class="col-form-label">Количество повторов (если время на гонку не 0)</label>
     </div>
 
+    <div class="form-group row">
+      <div class="col-1" style="min-width: 7em;">
+        <input type="text" class="form-control" id="inputCh1">
+      </div>
+      <div class="col-1" style="min-width: 7em;">
+        <input type="text" class="form-control" id="inputCh2">
+      </div>
+      <div class="col-1" style="min-width: 7em;">
+        <input type="text" class="form-control" id="inputCh3">
+      </div>
+      <div class="col-1" style="min-width: 7em;">
+        <input type="text" class="form-control" id="inputCh4">
+      </div>
+      <label for="inputCh4" class="col-form-label">Каналы</label>
+    </div>
+
     <div class="dropdown">
       <button class="btn btn-secondary dropdown-toggle" type="button" id="dropdownMenu1" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" style="margin-bottom: 20px;">
         Настройки TVP
@@ -171,18 +187,24 @@
 
     <div id="help" style="padding-top: 3em;">
       <div id="showBestChannels">
-        <a href="#" onclick="$('#showBestChannels > div.row').toggle()">Наилучшие сочетания каналов Raceband</a>
+        <a href="#" onclick="$('#showBestChannels > div.row').toggle();return false;">Наилучшие сочетания каналов</a>
         <div class="row helptable" style="display: none; width:20em;">
-          <div class="col">1</div>
-          <div class="col">2</div>
-          <div class="col">4</div>
-          <div class="col">5</div>
+          <div class="col">R1</div>
+          <div class="col">R2</div>
+          <div class="col">R4</div>
+          <div class="col">R5</div>
+          <div class="w-100"></div>
+          <br>
+          <div class="col">R1</div>
+          <div class="col">R3</div>
+          <div class="col">R6</div>
+          <div class="col">R7</div>
           <div class="w-100"></div>
           <br>
         </div>
       </div>
       <div id="showRaceband">
-        <a href="#" onclick="$('#showRaceband > div.row').toggle()">Частоты Raceband</a>
+        <a href="#" onclick="$('#showRaceband > div.row').toggle();return false;">Частоты Raceband</a>
         <div class="row" style="display: none;">
           <div class="col">1</div>
           <div class="col">2</div>
@@ -205,7 +227,7 @@
         </div>
       </div>
       <div id="showDE8process">
-        <a href="#" onclick="$('#showDE8process > div.row').toggle()">Сетка Double Elimination 8</a>
+        <a href="#" onclick="$('#showDE8process > div.row').toggle();return false;">Сетка Double Elimination 8</a>
         <div class="row" style="display: none; position: absolute; width:1197px; margin: auto;  left: 0;  right: 0;  text-align: center;  z-index: 1;">
           <img src="./data/de8.jpg">
         </div>
@@ -228,10 +250,11 @@
           <span class='group-pilots-results' style="display: none">
             <input type="number" class="form-control group-pilots-laps" id="gpl-1" title="круги" style="width: 50px; display:inline;" value="0">
             <input type="number" class="form-control group-pilots-place" id="gpp-1" title="место" style="width: 50px; display:inline;" value="0">
-            <input type="text" class="form-control group-pilots-time" id="gpt-1" title="время" style="width: 100px; display:inline;" value="0">
+            <input type="text" class="form-control group-pilots-time" id="gpt-1" title="время" style="width: 90px; display:inline;" value="0">
           </span>
           <span class="ch top badge badge-pill badge-warning"></span>
           <span class="stat"></span>
+          <span class="place"></span>
           <span class="judge bottom"></span>
         </div>
         <div id="pilot-2" class="pilots col">
@@ -239,10 +262,11 @@
           <span class='group-pilots-results' style="display: none">
             <input type="number" class="form-control group-pilots-laps" id="gpl-2" title="круги" style="width: 50px; display:inline;" value="0">
             <input type="number" class="form-control group-pilots-place" id="gpp-2" title="место" style="width: 50px; display:inline;" value="0">
-            <input type="text" class="form-control group-pilots-time" id="gpt-2" title="время" style="width: 100px; display:inline;" value="0">
+            <input type="text" class="form-control group-pilots-time" id="gpt-2" title="время" style="width: 90px; display:inline;" value="0">
           </span>
           <span class="ch top badge badge-pill badge-warning"></span>
           <span class="stat"></span>
+          <span class="place"></span>
           <span class="judge bottom"></span>
         </div>
         <div class="w-100"></div>
@@ -251,10 +275,11 @@
           <span class='group-pilots-results' style="display: none">
             <input type="number" class="form-control group-pilots-laps" id="gpl-3" title="круги" style="width: 50px; display:inline;" value="0">
             <input type="number" class="form-control group-pilots-place" id="gpp-3" title="место" style="width: 50px; display:inline;" value="0">
-            <input type="text" class="form-control group-pilots-time" id="gpt-3" title="время" style="width: 100px; display:inline;" value="0">
+            <input type="text" class="form-control group-pilots-time" id="gpt-3" title="время" style="width: 90px; display:inline;" value="0">
           </span>
           <span class="ch top badge badge-pill badge-warning"></span>
           <span class="stat"></span>
+          <span class="place"></span>
           <span class="judge bottom"></span>
         </div>
         <div id="pilot-4" class="pilots col">
@@ -262,10 +287,11 @@
           <span class='group-pilots-results' style="display: none">
             <input type="number" class="form-control group-pilots-laps" id="gpl-4" title="круги" style="width: 50px; display:inline;" value="0">
             <input type="number" class="form-control group-pilots-place" id="gpp-4" title="место" style="width: 50px; display:inline;" value="0">
-            <input type="text" class="form-control group-pilots-time" id="gpt-4" title="время" style="width: 100px; display:inline;" value="0">
+            <input type="text" class="form-control group-pilots-time" id="gpt-4" title="время" style="width: 90px; display:inline;" value="0">
           </span>
           <span class="ch top badge badge-pill badge-warning"></span>
           <span class="stat"></span>
+          <span class="place"></span>
           <span class="judge bottom"></span>
         </div>
     </div>

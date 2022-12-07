@@ -2,17 +2,15 @@
 
 const isDev = process.env.APP_DEV ? (process.env.APP_DEV.trim() === "true") : false;
 
-global.settings = {};
+//global.settings = {};
 //global.settings.pilots[n] { Num, Name, Channel, Group, Results[m]{pos, time, laps }
 //global.settings.groups[group][n] { Num, Name, Channel, ... }
 
-let timerCur; // текущее значение таймера
-let groupCur; // текущая группа пилотов
+//let timerCur; // текущее значение таймера
+//let groupCur; // текущая группа пилотов
 let timeInterval; // таймер race и prerace
-let raceLoop=0; // номер прохода через все группы;
-let inRace = 0; // сейчас запущена гонка
-let inCompetition = 0; // создана и запущена серия гонок
-let pause = 0;
+//let raceLoop=0; // номер прохода через все группы;
+
 
 const electron = require('electron');
 const main = electron.app;  // Модуль контролирующей жизненный цикл нашего приложения.
@@ -25,190 +23,28 @@ if( os.platform()==='win32') win32=1;
 
 require('@electron/remote/main').initialize();
 
-// Настройки
-const Store = require('electron-store'); // https://www.npmjs.com/package/electron-store
-const schema = {
-    judges: {
-        type: 'number',
-        maximum: 1,
-        minimum: 0,
-        default: 0
-    },
-    withoutTVP: {
-        type: 'number',
-        maximum: 1,
-        minimum: 0,
-        default: 0
-    },
-    prepareTimer: {
-        type: 'number',
-        maximum: 1200,
-        minimum: 0,
-        default: 0
-    },
-    raceTimer: {
-        type: 'number',
-        maximum: 1200,
-        minimum: 0,
-        default: 0
-    },
-    raceLaps: {
-        type: 'number',
-        maximum: 100,
-        minimum: 0,
-        default: 0
-    },
-    raceLoops: {
-        type: 'number',
-        maximum: 1000,
-        minimum: 0,
-        default: 10
-    },
-    obsUse: {
-        type: 'number',
-        maximum: 1,
-        minimum: 0,
-        default: 0
-    },
-    rules: {
-        type: 'number',
-        maximum: 10,
-        minimum: 1,
-        default: 1
-    }
-};
+const Race = require('./race.js');
+let race = new Race();
+race.loadSettings();
 
 
+const Tvp = require('./tvp.js');
+let tvp = new Tvp;
 
-const rules =[
-    {},
-    {
-        id: 1,
-        name: 'Тренеровка',
-        saveLaps: 0,    // пишем статистику пройденных кругов
-        saveTime: 0,    // ...времени
-        savePlace: 0,   // ...занятого места
-        minPilots: 1,   // участников не меньше
-        maxPilots: 100, // участников не больше
-        showNext: 1,    // показывать на экране приглашения готовящуюся группу
-        wavNextNum: 1,   // 1 - вызывается группа {номер}, 0 - вызывается следующая группа
-        lapsLimit: 0    // гонка на Х кругов
-    },
-    {
-        id: 2,
-        name: 'Квалификация',
-        saveLaps: 1,
-        saveTime: 1,
-        savePlace: 0,
-        minPilots: 1,
-        maxPilots: 100,
-        showNext: 1,
-        wavNextNum: 1,
-        lapsLimit: 0
-    },
-    {},
-    {
-        //https://www.multigp.com/wp-content/uploads/2019/04/multigp-double-elim-brackets1.png
-        id: 4,
-        name: 'Double Elimination 8',
-        saveLaps: 0,
-        saveTime: 1,
-        savePlace: 1,
-        minPilots: 8,
-        maxPilots: 8,
-        loops: 6,
-        groups: 1,  // одна рабочая группа, в которой каждый раунд меняем пилотов
-        showNext: 0, // не знаем пилотов - нечего показывать
-        wavNextNum: 0,
-        lapsLimit: 1
-    },
-    {
-        id: 5,
-        name: 'Турнир 4',
-        saveLaps: 0,
-        saveTime: 1,
-        savePlace: 1,
-        minPilots: 1,
-        maxPilots: 4,
-        showNext: 1,
-        wavNextNum: 0,
-        lapsLimit: 1
-    },
-
-];
-
-const rulesFunc=[];
-rulesFunc[1] = {};
-rulesFunc[2] = {
-    fFinalPos: posQualification,
-};
-rulesFunc[5] = {
-    fFinalPos: posBattle4,
-};
-rulesFunc[4] ={
-    fRaceNext: seedDE8group,    // создать группу для вылета
-    fRaceName: nameDE8, // название вылета
-    fGroupsOnLoad: seedDE8groupsOnLoad, // создать группы для вывода на экран загрузки
-    fFinalPos: posDE8,      // подвести результаты
-    fJudges: setJudgesDE8,   // назначить судей
-    fFindRace: findRaceDE8 // найти следующий вылет после загрузки xls
-};
-
-const store = new Store({schema});
-loadSettings();
-
-// Общение с TVP
-//https://github.com/MylesBorins/node-osc
-// Нам нужна 6 версия. В пятой криво принималась кирилица.
-// Еще она использует osc-min, который использует new Buffer. И это приводит к  DeprecationWarning: Buffer() is deprecated due to security and usability issues. Please use the Buffer.alloc(), Buffer.allocUnsafe(), or Buffer.from() methods instead.
-//const { Client, Server } = require('node-osc/dist/lib/index.js'); // В package.json 6 версии node-osc не указан "main": "./dist/lib/index.js", - в electron 10 приходится так
-const { Client, Server } = require('node-osc'); // в электрон 15 работает так
-const client = new Client('127.0.0.1', 4000);
-const oscServer = new Server(4001, '127.0.0.1', () => {
-    console.log('OSC Server is listening');
-});
-
-oscServer.on('message', function (msg) {
+tvp.oscServer.on('message', function (msg) {
     console.log(`OSC RX: ${msg}` );
-    if( inCompetition===1 && inRace===1 && !global.settings.withoutTVP && String(msg[0]) === '/racefinished' ) {
-        //m.addStringArg( stat[i].pilot );
-        //m.addIntArg( stat[i].pos );
-        //m.addIntArg( stat[i].lps );
-        //m.addFloatArg( stat[i].total );
-        let stat = [];
-        if( msg.length >1 ){
-            let a=0;
-            for (let i = 1; i < msg.length; i+=4) {
-                stat[a] = {};
-                stat[a].pilot = msg[i];
-                stat[a].pos = msg[i+1];
-                stat[a].lps = msg[i+2];
-                stat[a].total = msg[i+3];
-                a++;
-            }
-        }
-        console.log('racefinished: '+stat);
+    if( race.inCompetition===1 && race.inRace===1 && !race.settings.withoutTVP && String(msg[0]) === '/racefinished' ) {
+        let stat = tvp.getStatAfterRaceFinished(msg);
+        stat= tvp.statCorrection( stat, race.groups[race.groupCur].length);
         finishRace(stat);
         console.log('Finish message accepted');
     }
     //oscServer.close();
 });
 
-// Общение с OBS
-// https://github.com/haganbmj/obs-websocket-js
-const OBSWebSocket = require('obs-websocket-js');
-const obs = new OBSWebSocket();
 
-// увидели событие - смена сцены
-obs.on('SwitchScenes', data => {
-    console.log(`New Active Scene: ${data.sceneName}`);
-});
-
-
-// You must add this handler to avoid uncaught exceptions.
-obs.on('error', err => {
-    console.error('OBS socket error:', err);
-});
+const Obs = require('./obs.js');
+let obs = new Obs();
 
 
 process.on('unhandledRejection', (reason, p) => {
@@ -297,16 +133,7 @@ ipcMain.on( 'get-xls-tpl', ()=> {
     console.log('start');
     const XLSX = require('xlsx'); // https://github.com/SheetJS/sheetjs
     let wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.json_to_sheet([
-        {Num: 1, Name: "Вася", Channel: 1, Group: 1},
-        {Num: 2, Name: "Петя", Channel: 3, Group: 1},
-        {Num: 3, Name: "Вася", Channel: 6, Group: 1},
-        {Num: 4, Name: "Петя", Channel: 8, Group: 1},
-        {Num: 5, Name: "Вася", Channel: 1, Group: 2},
-        {Num: 6, Name: "Петя", Channel: 3, Group: 2},
-        {Num: 7, Name: "Вася", Channel: 6, Group: 2},
-        {Num: 8, Name: "Петя", Channel: 8, Group: 2},
-    ], {header: ["Num", "Name", "Channel", "Group"]});
+    const ws = XLSX.utils.json_to_sheet( race.getXLSTemplate(), {header: ["Num", "Name", "Slot", "Group"]});
     XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
     const options = {
         defaultPath: '~/tpl.xls',
@@ -341,14 +168,7 @@ function showSaveDialog( mainWindow, options, wb, XLSX)
 Событие - Создать необходимые каналы в OBS
  */
 ipcMain.handle( 'obsCreateScenes', async (event, arg)=> {
-    obs.connect({
-        address: 'localhost:' + arg['port'],
-        password: arg['pass']
-    })
-    .then( () => obs.send('CreateScene', {'sceneName': arg['TVP']}) )
-    .then( () => obs.send('CreateScene', {'sceneName': arg['WR']}) )
-    .then( () => obs.send('CreateScene', {'sceneName': arg['Break']}) )
-    .then( () => obs.disconnect() );
+    await obs.createScenes(arg);
 });
 
 /*
@@ -356,26 +176,15 @@ ipcMain.handle( 'obsCreateScenes', async (event, arg)=> {
  */
 ipcMain.handle( 'obsCheckConnection', async (event, arg)=> {
     // await - ждем результата
-    const res = await obs.connect({
-            address: 'localhost:' + arg['port'],
-            password: arg['pass']
-    }).then(() => {
-        obs.disconnect();
-        const { dialog } = require('electron');
-        dialog.showMessageBoxSync({ 'message': 'Подключено', 'type':'info'});
-        return 1;
-    }).catch((error) => {
-        console.error(error);
-        //{dialog} = require('electron').remote;
-        //dialog.showErrorBox('title here','type error message here');
-        const { dialog } = require('electron');
+    let res = await obs.checkConnection(arg);
+    if (res) {
+        const {dialog} = require('electron');
+        dialog.showMessageBoxSync({'message': 'Подключено', 'type': 'info'});
+    } else {
+        const {dialog} = require('electron');
         dialog.showErrorBox('Ошибка', 'Нет подключения');
-        return 0;
+    }
 
-    });
-    //client.send( '/v1/camera/1/label','param');
-    console.log( 'OBS connection: '+res);
-    return res;
 });
 
 
@@ -385,27 +194,31 @@ ipcMain.handle( 'parse-xls', async (event, arg)=> {
     const first_sheet_name = wb.SheetNames[0];
     const ws = wb.Sheets[first_sheet_name];
     const pilotsObj =  XLSX.utils.sheet_to_json(ws, {defval: false});
-    let pilots = parseXLS(pilotsObj, global.settings.rules);
+    let pilots = race.parseXLS(pilotsObj);
     if( pilots === false ) { // не валидное кол-во пилотов для данных правил
         dialog.showErrorBox('Ошибка', 'Количество пилотов не соответствует выбранным правилам');
         return false;
     }
-    global.settings.pilots = pilots;
-    global.settings.groups = preparePilotsGroups(pilots, global.settings.rules);
+    race.setPilots(pilots);
+    race.setGroups();
     //global.settings.pilots = addJudges(pilots, global.settings.rules);
-    store.set('pilots', global.settings.pilots);
-    return global.settings.groups;
+    race.savePilots();
+    return {groups: race.getGroups(), channels: race.settings.channels};
 });
 
+// смена правил, когда пилоты загружены
 ipcMain.handle( 'repackGroups', async (event, arg) =>{
-    if( global.settings.pilots.length<rules[arg].minPilots || global.settings.pilots.length>rules[arg].maxPilots ) {
+    if( !race.checkRulesPilotsAmount(arg) ) {
         dialog.showErrorBox('Ошибка', 'Количество пилотов не соответствует выбранным правилам');
         return false;
     }
-    global.settings.groups = preparePilotsGroups(global.settings.pilots, arg);
+    race.setRules(arg);
+    race.setGroups();
     //global.settings.pilots = addJudges(global.settings.pilots, arg);
-    store.set('pilots', global.settings.pilots);
-    return global.settings.groups;
+    race.savePilots();
+    race.saveRules();
+    return {groups: race.getGroups(), channels: race.settings.channels};
+
 });
 
 /*
@@ -414,45 +227,35 @@ ipcMain.handle( 'repackGroups', async (event, arg) =>{
 ipcMain.handle( 'submit-race', async (event, arg)=> {
     const { dialog } = require('electron');
 
-    // если в правилах записаны loops - это приоритетней данных из формы
-    if( rules[ global.settings.rules ].loops !== undefined ) arg.raceLoops = rules[ global.settings.rules ].loops;
-    setSettings(arg);
-    if( global.settings.groups.length===0) {
+    arg = race.processFormSettings(arg);
+    race.setSettings(arg);
+    if( !race.arePilotsPresent() ) {
         dialog.showErrorBox('Ошибка', 'Загрузите пилотов');
-        return 0;
+        return false;
     }
-
-    if( global.settings.pilots.length<rules[global.settings.rules].minPilots || global.settings.pilots.length>rules[global.settings.rules].maxPilots ) {
+    if( !race.checkRulesPilotsAmount(arg.rules) ) {
         dialog.showErrorBox('Ошибка', 'Количество пилотов не соответствует выбранным правилам');
-        return 0;
+        return false;
     }
 
-    saveSettings(arg);
+    race.saveSettings(arg);
 
     // длительное подключение
     if( arg['obsUse'] ){
-        await connectObs(arg['obsPort'], arg['obsPassword']);
+        await obs.connect(arg['obsPort'], arg['obsPassword']);
     }
 
-    global.settings.pilots.forEach( function ( item ) {
-        item.Results = [];
-    });
+    race.setGroups(); // Перепаковать группы. Они могут быть изменены после прошлой гонки. Например DE8
+    race.clearResults();
+    race.resetRaceVars();
 
-    raceLoop=0;
-    groupCur=0;
-    inCompetition=1;
-    store.set('groupCur', groupCur);
-    store.set('raceLoop', raceLoop);
-    store.set('inCompetition', inCompetition);
-
-    pause=0;
     if( !arg['withoutTVP']){
-        sendRaceDuration(global.settings.raceTimer);
-        if( rules[ global.settings.rules ].lapsLimit === 0 ) sendRaceLaps(100);
-        else sendRaceLaps(global.settings.raceLaps);
+        tvp.sendRaceDuration(race.settings.raceTimer);
+        if( race.getRulesLapsLimit(race.settings.rules_num) === 0 ) tvp.sendRaceLaps(100);
+        else tvp.sendRaceLaps(race.settings.raceLaps);
     }
 
-    console.log('submit-race pilots: ', global.settings.pilots);
+    console.log('submit-race pilots: ', race.settings.pilots);
 
     return 1;
 });
@@ -460,24 +263,22 @@ ipcMain.handle( 'submit-race', async (event, arg)=> {
 
 // подготовка к возобновлению гонки
 ipcMain.handle( 'resume-race', async ()=> {
-    if( global.settings.raceLoops && raceLoop>=global.settings.raceLoops) {
+    if( race.isLastRaceLoop() ) {
         const { dialog } = require('electron');
         dialog.showMessageBoxSync({ 'message': 'Гонка завершена', 'type':'info'});
         return 0;
     }
-    inCompetition=1; // del?
-    pause=0;
-    if( !global.settings.withoutTVP ){
-        sendRaceDuration(global.settings.raceTimer);
-        if( rules[ global.settings.rules ].lapsLimit === 0 ) sendRaceLaps(100);
-        else sendRaceLaps(global.settings.raceLaps);
+    race.inCompetition=1; // todo del?
+    race.unpause();
+    if( !race.settings.withoutTVP ){
+        tvp.sendRaceDuration(race.settings.raceTimer);
+        if( race.getRulesLapsLimit(race.settings.rules_num) === 0 ) tvp.sendRaceLaps(100);
+        else tvp.sendRaceLaps(race.settings.raceLaps);
     }
-    if( global.settings.obsUse ){
-        connectObs( global.settings.obsPort, global.settings.obsPassword);
+    if( race.settings.obsUse ){
+        await obs.connect(race.settings.obsPort, race.settings.obsPassword);
     }
-    if( rulesFunc[ global.settings.rules ].fRaceNext !== undefined)  {
-        global.settings.groups[0] = rulesFunc[ global.settings.rules ].fRaceNext(global.settings.pilots, raceLoop);
-    }
+    race.seedGroup();
 
     return 1;
 });
@@ -486,16 +287,16 @@ ipcMain.handle( 'resume-race', async ()=> {
 Событие - Сохранить настройки с формы
  */
 ipcMain.handle( 'save-settings', async (event, arg)=> {
-    setSettings(arg);
-    saveSettings(arg);
+    race.setSettings(arg);
+    race.saveSettings(arg);
     const { dialog } = require('electron');
     dialog.showMessageBoxSync({ 'message': 'Сохранено', 'type':'info'});
     return 1;
 });
 
 ipcMain.on( 'save-rules', (event, arg)=> {
-    global.settings.rules=arg;
-    store.set('rules', arg);
+    race.setRules(arg);
+    race.saveRules();
     return 1;
 });
 
@@ -504,13 +305,10 @@ ipcMain.on( 'save-rules', (event, arg)=> {
 Приглашение пилотов
  */
 ipcMain.on( 'start-prerace', (event, arg)=> {
+    console.log( 'start-prerace', arg['group']);
     let group = arg['group'];
-    if( group !== false ) {
-        if (group < 0) group = global.settings.groups.length - 1;
-        if (group > global.settings.groups.length) group = 0;
-        groupCur = group;
-    }
-    store.set('groupCur', groupCur);
+    race.setCurrentGroup( group );
+    race.saveCurrentGroup();
     startPrerace();
 });
 
@@ -519,28 +317,26 @@ ipcMain.on( 'start-race', ()=>{
 });
 
 ipcMain.handle( 'suspend-race', async ()=> {
-    //inCompetition=0;
-    if( global.settings.obsUse ) obs.disconnect(); // на случай обрыва соединения с ОБС по любой причине. Выйдя в меню и вернувшись в гонку - мы переподключаемся.
+    if( race.settings.obsUse ) obs.disconnect(); // на случай обрыва соединения с ОБС по любой причине. Выйдя в меню и вернувшись в гонку - мы переподключаемся.
     clearInterval(timeInterval);
 });
 
 ipcMain.on('terminate-race', ()=>{
-    inCompetition = 0;
-    store.set('inCompetition', inCompetition);
+    race.terminateRace();
 });
 
 ipcMain.on( 'add-prerace-time',  ()=> {
-    if( !inRace ) addPreraceTime();
+    race.addPreraceTime(60);
     return 1
 });
 
 ipcMain.on( 'pause-prerace',  ()=> {
-    if( !inRace ) pausePrerace();
+    switchPausePrerace();
     return 1
 });
 
 ipcMain.on( 'pause-results',  ()=> {
-    if( !inRace ) pausePrerace();
+    switchPausePrerace();
     return 1
 });
 
@@ -554,39 +350,38 @@ ipcMain.on( 'screenshot-results',  (event, arg)=> {
 Получить результаты для статистики вызванной из меню
  */
 ipcMain.on( 'get-stat',  ()=> {
-    if( global.settings.raceLoops && raceLoop>=global.settings.raceLoops) {
+    if( race.isLastRaceLoop() ) {
         //ИТОГОВЫЙ ИТОГ
-        showFinalResults( global.settings.pilots, global.settings.rules );
+        showFinalResults( race.settings.pilots, race.rules );
     }
     else{
         //промежуточный итог
-        showIntermediateResults( global.settings.pilots, global.settings.rules );
+        //let race = new Race(global.settings.pilots, global.settings.rules, raceLoop, rules, rulesFunc);
+        let res = race.calcIntermediateResults();
+        //race.setPilotsPlaces(res);
+        showIntermediateResults(res);
     }
 });
 
 
 ipcMain.handle( 'get-progress',  ()=> {
-    return { inCompetition: inCompetition, raceLoop: raceLoop, groupCur: groupCur, rulesName: getRulesName() };
+    return { groups: race.groups, settings: race.settings, inCompetition: race.inCompetition, raceLoop: race.raceLoop, groupCur: race.groupCur, rulesName: race.getRulesName() };
 });
+
+
+ipcMain.handle( 'get-pilot-context-menu',  ()=> {
+
+    return { inCompetition: race.inCompetition, raceLoop: race.raceLoop, groupCur: race.groupCur, rulesName: race.getRulesName() };
+});
+
 
 // Получаем результаты гонки с формы и сохраняем
 ipcMain.on( 'get-results',  ( event, arg )=> {
     console.log('get-results: ', arg);
-    console.log('get-results pilots: ', global.settings.pilots);
-    console.log('get-results groups: ', global.settings.groups);
-    console.log('get-result: ', groupCur);
-    let num;
-    for( let i=0; i<global.settings.groups[groupCur].length; i++ ){
-        num = global.settings.groups[groupCur][i].Num;
-        if( typeof global.settings.pilots[num].Results === 'undefined' ){
-            global.settings.pilots[num].Results = [];
-        }
-        global.settings.pilots[num].Results[raceLoop]= arg['results'][i];
-
-    }
-    console.log('get-results pilots new: ', global.settings.pilots);
-
-    store.set('pilots', global.settings.pilots);
+    console.log('get-results pilots: ', race.settings.pilots);
+    console.log('get-results groups: ', race.groups);
+    console.log('get-result: ', race.groupCur);
+    race.setAndSaveRaceResultsFromForm(arg['results']);
 
     let fs = require('fs');
     fs.writeFile( './results/'+filenameDate()+'.txt', JSON.stringify(arg['results']), function (err) {
@@ -643,106 +438,11 @@ function takeScreenshot( x, y, width, height) {
 
 }
 
-function parseXLS( xlsjson, rules_num  )
-{
-    let loop =0;
-    let curLoop;
-    let result = [];
-    let fSetPos = 0;
-    if( xlsjson.length<rules[rules_num].minPilots || xlsjson.length>rules[rules_num].maxPilots) return false;
-
-    xlsjson.forEach( function ( pilot, i ) {
-        let p=0;
-        let pos, time, laps;
-        result[i] = {};
-        result[i].Results = [];
-        Object.keys(pilot).map(function(objectKey, index) {
-            if( objectKey === 'Num' )  { // Запишем Num от 0 и попорядку
-                result[i][objectKey] = i;
-                return;
-            }
-            let value = pilot[objectKey];
-            if (index<=3 ) result[i][objectKey] = value;
-            else {
-                if( value === false ) return;
-                p = (index-4) % 3;
-                switch(p) {
-                    case 0:
-                        pos=value;
-                        break;
-                    case 1:
-                        time= value;
-                        break;
-                    case 2:
-                        laps= value;
-                        result[i].Results[ Math.floor((index-4)/3) ]={ pos: pos, time:time, laps:laps};
-                }
-            }
-        });
-    });
-
-
-    if( rulesFunc[ rules_num ].fFindRace !== undefined ) {
-        let pos = rulesFunc[ rules_num ].fFindRace(result);
-        raceLoop = pos.loop;
-        groupCur = pos.group;
-    }
-    else{
-        result.forEach( function ( pilot, i ) {
-            curLoop = result[i].Results.length;
-            if( curLoop < loop) { // если этот пилот пролетел меньше вылетов, чем предыдущий
-                fSetPos = 1;
-                groupCur = result[i].Group-1;
-                raceLoop = curLoop;
-            }
-            else loop = curLoop;
-        });
-        if( !fSetPos ) {
-            raceLoop = loop;
-            groupCur = 0;
-        }
-    }
-    console.log(result, raceLoop, groupCur);
-    return result;
-}
-
-function findRaceDE8(pilots)
-{
-    let max = 0;
-    let len;
-    pilots.forEach( function ( pilot ) {
-        len = pilot.Results.length;
-        if( len>max ) max = len;
-    });
-    return {loop: max, group: 0};
-}
-
 
 // Сохраним текущие результаты в XLS
 ipcMain.on( 'export-xls',  ()=> {
-    let result = [];
-    global.settings.pilots.forEach( function ( pilot, i) {
-        result[i] = {};
-        result[i].Num = i;
-        result[i].Name=pilot.Name;
-        result[i].Channel = pilot.Channel;
-        result[i].Group = pilot.Group;
-        for( let j=0; j<raceLoop; j++){
-        //pilot.Results.forEach( function(res, j) {
-            if( pilot.Results[j] !== undefined && pilot.Results[j] !== null ) {
-                result[i]['P' + j] = pilot.Results[j].pos;
-                result[i]['T' + j] = pilot.Results[j].time;
-                result[i]['L' + j] = pilot.Results[j].laps;
-            }
-        }
-    });
-
-    let header = ["Num", "Name", "Channel", "Group"];
-    for( let j=0; j<raceLoop; j++){
-        header.push('P' + j);
-        header.push('T' + j);
-        header.push('L' + j);
-    }
+    let result = race.calcResultsTableForXLS();
+    let header = race.calcResultsHeaderForXLS();
 
     const XLSX = require('xlsx'); // https://github.com/SheetJS/sheetjs
     let wb = XLSX.utils.book_new();
@@ -760,20 +460,18 @@ ipcMain.on( 'export-xls',  ()=> {
     showSaveDialog( mainWindow, options, wb, XLSX);
 });
 
-/*todo убрать id*/
-function initializeClock(id, counter, endFunc = function(){return 0}) {
 
+function initializeClock( counter, endFunc = function(){return 0}) {
     function updateClock() {
-        if( !pause ) {
-            timerCur--;
-            mainWindow.webContents.send('timer-value', timerCur);
-            if (timerCur <= 0) {
+        if( !race.pause ) {
+            race.reduceTimer();
+            mainWindow.webContents.send('timer-value', race.getTimer() );
+            if ( race.timeIsUp() ) {
                 clearInterval(timeInterval);
                 endFunc();
-                //timerCur = 0;
             }
             else {
-                if(inCompetition===1 && inRace===0 && timerCur===20){
+                if( race.timeForWarning20s() ){
                     mainWindow.webContents.send('20togo');
                 }
             }
@@ -783,7 +481,7 @@ function initializeClock(id, counter, endFunc = function(){return 0}) {
         }
     }
     clearInterval(timeInterval);
-    timerCur = counter;
+    race.setTimer( counter );
     timeInterval = setInterval(updateClock, 1000);
 }
 
@@ -792,38 +490,29 @@ function initializeClock(id, counter, endFunc = function(){return 0}) {
  */
 function startRace() {
     clearInterval(timeInterval); // не убирать из-за delay ниже
-    pause = 0;
-    console.log( 'Start G'+(groupCur+1)+'/'+global.settings.groups.length+' L'+(raceLoop+1)+'/'+global.settings.raceLoops);
+    race.unpause();
+    console.log( 'Start G'+(race.groupCur+1)+'/'+race.groups.length+' L'+(race.raceLoop+1)+'/'+race.settings.raceLoops);
 
     // отправить пилотов в TVP
-    if( !global.settings.withoutTVP ) {
-        for (let i = 0; i < 4; i++) {
-            if( i < global.settings.groups[groupCur].length) {
-                sendPilotName(i + 1, global.settings.groups[groupCur][i]['Name']);
-                onCamera(i+1);
-            }
-            else {
-                sendPilotName(i + 1, '');
-                offCamera(i+1)
-            }
-        }
+    if( !race.settings.withoutTVP ) {
+        tvp.sendNames( race.groups[race.groupCur] );
     }
 
-    if( global.settings.obsUse && !global.settings.withoutTVP ) {
-        changeSceneObs( global.settings.obsSceneTVP);
+    if( race.settings.obsUse && !race.settings.withoutTVP ) {
+        obs.changeScene( race.settings.obsSceneTVP);
     }
-    mainWindow.webContents.send('show-race', {rules : rules[global.settings.rules], win32 : win32} );
-    if( !global.settings.withoutTVP){
-        sendStartCommand();
+    mainWindow.webContents.send('show-race', {rules : race.rules, win32 : win32, raceTimer: race.settings.raceTimer, withoutTVP: race.settings.withoutTVP} );
+    if( !race.settings.withoutTVP){
+        tvp.sendStartCommand();
     }
-    inRace = 1; // после команды на старт!
-    if ( global.settings.raceTimer !==0) {
-        if (global.settings.withoutTVP) {
+    race.inRaceOn(); // после команды на старт!
+    if ( race.settings.raceTimer !==0) {
+        if (race.settings.withoutTVP) {
             if( win32 ) {
                 playSoundCountOnWin();
             }
             delay(5500, 1).then(() => {
-                if( inRace) initializeClock('race-timer', global.settings.raceTimer, finishRace); // проверка на случай смены группы, пока считает таймер
+                if( race.inRace ) initializeClock( race.settings.raceTimer, finishRace); // проверка на случай смены группы, пока считает таймер
             });
         } else {
             // ждем сообщение от TVP
@@ -838,451 +527,119 @@ stat : array pilot, pos, lps, total
  */
 function finishRace(stat = null)
 {
-    inRace = 0;
-    console.log('finishRace: Finish G'+(groupCur+1)+'/'+global.settings.groups.length+' L'+(raceLoop+1)+'/'+global.settings.raceLoops);
-    mainWindow.webContents.send('finish');
+    race.inRaceOff();
+    console.log('finishRace: Finish G'+(race.groupCur+1)+'/'+race.groups.length+' L'+(race.raceLoop+1)+'/'+race.settings.raceLoops);
+    mainWindow.webContents.send('finish', {withoutTVP:race.settings.withoutTVP});
 
-
-    // результаты
-    //console.log(rules[global.settings.rules].savePlace+rules[global.settings.rules].saveTime+rules[global.settings.rules].saveLaps);
-    if( rules[global.settings.rules].savePlace+rules[global.settings.rules].saveTime+rules[global.settings.rules].saveLaps!==0 ){
+    // если нужны результаты
+    if( race.areResultsNeeded() ){
         console.log( 'finishRace: ', stat );
-        console.log( 'finishRace: ', rules[global.settings.rules] );
-        if( global.settings.withoutTVP ) {
-            stat = null;
-        }
-        else {
-            if (stat === null || stat.length === 0) stat = emptyCorrection(global.settings.groups[groupCur].length);
-            else stat = zeroCorrection(stat);
-        }
-        console.log( 'correction:', stat);
-        mainWindow.webContents.send('editresults', { stat : stat, rules : rules[global.settings.rules] });
-        if( global.settings.obsUse ) changeSceneObs( global.settings.obsSceneWR);
-        if( global.settings.withoutTVP ) {
-            pausePrerace();
-            initializeClock('prepare-timer', 2, saveRaceReq);
+        console.log( 'finishRace: ', race.rules );
+        if( race.settings.withoutTVP )  stat = null;
+
+        mainWindow.webContents.send('editresults', { stat : stat, rules : race.rules });
+        if( race.settings.obsUse ) obs.changeScene( race.settings.obsSceneWR);
+        if( race.settings.withoutTVP ) {
+            switchPausePrerace();
+            initializeClock( 2, saveRaceReq);
         } // автопауза для заполнения таблицы результатов
-        else initializeClock('prepare-timer', 7, saveRaceReq); // пауза для проверки результатов
+        else initializeClock(7, saveRaceReq); // пауза для проверки результатов
     }
     else nextRace();
     console.log( 'finishRace is completed');
 }
 
-// TVP может выдать нули в статистике, если некоторые пилоты не вылетили. Это нужно исправить.
-// stat : array pilot, pos, lps, total
-function zeroCorrection(stat)
-{
-    let maxP = 0;
-    stat.forEach( function (item) {
-        if( item.pos>maxP) maxP = item.pos;
-    });
-    stat.forEach( function (item) {
-        if (item.pos === 0) {
-            item.pos = maxP + 1;
-            maxP++;
-        }
-    });
-    return stat;
-}
 
-// TVP может не выдать результат, если все пилоты не вылетели
-function emptyCorrection( num ) {
-    let res = [];
-    for( let i=0; i< num; i++){
-        res[i]={pos:i+1, lps:0, total:0};
-    }
-    return res;
-}
 
 /*
 Запрос результатов гонки у рендера
  */
 function saveRaceReq() {
-    if( rules[global.settings.rules].savePlace+rules[global.settings.rules].saveTime+rules[global.settings.rules].saveLaps!==0 ) {
+    if( race.areResultsNeeded() ) {
         mainWindow.webContents.send('query-results', 'nextRace');
     }
     else nextRace();
 }
 
-function findPilotInLoop(pilots, loop, place) {
-    //console.log('l', loop, 'p', place);
-    for (let i = 0; i < pilots.length; i++) {
-        if( pilots[i].Results[loop] !== undefined && pilots[i].Results[loop] !== null ) {
-            if (pilots[i].Results[loop].pos === place) return i;
-        }
-    }
-    console.error('ERROR findPilotInLoop: не найден L:',loop, 'P:', place  );
-    return false;
-}
-
-function findPilotInGroup(group, loop, place) {
-    for (let i = 0, len =  global.settings.groups[group].length; i < len; i++) {
-        if (global.settings.pilots[ global.settings.groups[group][i].Num ].Results[loop].pos === place) {
-            return global.settings.groups[group][i].Num;
-        }
-    }
-    console.error('ERROR findPilotInGroup: не найден G:',group,'L:',loop, 'P:', place  );
-    return false;
-}
-
-function nameDE8(race) {
-    const names = [ 'Группа 1', 'Группа 2', 'За 7 и 8 место', 'За выход в финал', 'За выход в финал, 5 и 6 место', 'Финал'];
-    return names[race];
-}
 
 
-function seedDE8group(pilots, race){
-//0 - Gr 0
-//1 - Gr 1
-//2 - [0] Place 3, 4, [1] Place 3, 4
-//3 - [0] p 1,2, [1] p 1,2
-//4 - [3] p 3,4, [2] p 1,2
-//5 - [3] p 1,2, [4] p 1,2
-
-    let group = [];
-    switch( race ) {
-        case 0:
-            group[0] = pilots[1];
-            group[1] = pilots[2];
-            group[2] = pilots[4];
-            group[3] = pilots[6];
-            break;
-        case 1:
-            group[0] = pilots[0];
-            group[1] = pilots[3];
-            group[2] = pilots[5];
-            group[3] = pilots[7];
-            break;
-        case 2:
-            group[0] = pilots[findPilotInLoop( pilots,0, 3)];
-            group[1] = pilots[findPilotInLoop( pilots, 0, 4)];
-            group[2] = pilots[findPilotInLoop( pilots, 1, 3)];
-            group[3] = pilots[findPilotInLoop( pilots, 1, 4)];
-            break;
-        case 3:
-            group[0] = pilots[findPilotInLoop( pilots, 0,  1)];
-            group[1] = pilots[findPilotInLoop( pilots, 0,  2)];
-            group[2] = pilots[findPilotInLoop( pilots, 1,  1)];
-            group[3] = pilots[findPilotInLoop( pilots, 1,  2)];
-            break;
-        case 4:
-            group[0] = pilots[findPilotInLoop( pilots, 2, 1)];
-            group[1] = pilots[findPilotInLoop( pilots, 2, 2)];
-            group[2] = pilots[findPilotInLoop( pilots, 3, 3)];
-            group[3] = pilots[findPilotInLoop( pilots, 3, 4)];
-            break;
-        case 5:
-            group[0] = pilots[findPilotInLoop( pilots, 4,  1)];
-            group[1] = pilots[findPilotInLoop( pilots, 4,  2)];
-            group[2] = pilots[findPilotInLoop( pilots, 3,  1)];
-            group[3] = pilots[findPilotInLoop( pilots, 3,  2)];
-            break;
-    }
-    return group;
-}
-
-// группы для отображения в меню
-function seedDE8groupsOnLoad( pilots ) {
-    let group = [];
-    if( pilots.length>=8) {
-        group[0] = [];
-        group[1] = [];
-        group[0][0] = pilots[1];
-        group[0][1] = pilots[2];
-        group[0][2] = pilots[4];
-        group[0][3] = pilots[6];
-        group[1][0] = pilots[0];
-        group[1][1] = pilots[3];
-        group[1][2] = pilots[5];
-        group[1][3] = pilots[7];
-    }
-    else{ // не валидно
-        group[0]=[];
-        for (let i = 0; i < pilots.length; i++ ) {
-            group[1].push(pilots[i]);
-        }
-    }
-
-    if( pilots.length>8) { // не валидно
-        group[2]=[];
-        for (let i = 8; i < pilots.length; i++ ) {
-            group[2].push(pilots[i]);
-        }
-    }
-    return group;
-}
-
-function setJudgesDE8(pilots) {
-    pilots[0].Judges = pilots[1].Name;
-    pilots[3].Judges = pilots[2].Name;
-    pilots[5].Judges = pilots[4].Name;
-    pilots[7].Judges = pilots[6].Name;
-    pilots[1].Judges = pilots[0].Name;
-    pilots[2].Judges = pilots[3].Name;
-    pilots[4].Judges = pilots[5].Name;
-    pilots[5].Judges = pilots[7].Name;
-    return pilots;
+function showIntermediateResults( res ) {
+    mainWindow.webContents.send('show-results', { results : res, round : race.raceLoop, raceLoops: race.settings.raceLoops });
 }
 
 
 function nextRace() {
     // переключить группу
-    groupCur++;
-
-    // следующий раунд
-    if( (rules[global.settings.rules].groups !== undefined && groupCur>=rules[global.settings.rules].groups) || groupCur>=global.settings.groups.length) {
-        groupCur=0;
-        raceLoop++;
-        if( rulesFunc[ global.settings.rules ].fRaceNext !== undefined)  {
-            global.settings.groups[0] = rulesFunc[ global.settings.rules ].fRaceNext(global.settings.pilots, raceLoop);
-        }
-        store.set('groupCur', groupCur);
-        store.set('raceLoop', raceLoop);
-        if( global.settings.raceLoops && raceLoop>=global.settings.raceLoops) {
+    race.setAndSaveNextGroupAndLoop();
+    if( race.isNewLoop() ) {
+        if( race.isCompetitionOver() ) {
             //ИТОГОВЫЙ ИТОГ
-            if( rules[global.settings.rules].savePlace+rules[global.settings.rules].saveTime+rules[global.settings.rules].saveLaps>0 ) {
-                showFinalResults(global.settings.pilots, global.settings.rules);
+            if( race.areResultsNeeded() ) {
+                showFinalResults( race.settings.pilots, race.settings.rules );
             }
             else{
-                mainWindow.webContents.send('show-results', { results : false, round : raceLoop });
+                mainWindow.webContents.send('show-results', { results : false, round : race.raceLoop, raceLoops: race.settings.raceLoops  });
             }
         }
         else{
             //промежуточный итог
-            if( rules[global.settings.rules].savePlace+rules[global.settings.rules].saveTime+rules[global.settings.rules].saveLaps===0 ) {
-                startPrerace();
+            if( race.areResultsNeeded() ) {
+                initializeClock(10, startPrerace);
+                let res = race.calcIntermediateResults();
+                race.setPilotsPlaces(res);
+                race.savePilots();
+                showIntermediateResults(res);
             }
             else {
-                initializeClock('prepare-timer', 10, startPrerace);
-                showIntermediateResults( global.settings.pilots, global.settings.rules );
+                startPrerace();
             }
         }
     }
     else {
         // следующая группа
-        store.set('groupCur', groupCur);
         startPrerace();
     }
     console.log( 'nextRace is completed');
 }
 
 
-function showIntermediateResults( pilots, rules ) {
-    let res = prepareResultsForRender( pilots, rules );
-    mainWindow.webContents.send('show-results', { results : res, round : raceLoop });
-}
-
-
+// todo недописана?
 function showFinalResults( pilots, rules ) {
-    let res = prepareResultsForRender(pilots, rules, 1);
-    mainWindow.webContents.send('show-results', { results : res, round : raceLoop });
+    let res = race.calcIntermediateResults(1);
+    //race.setPilotsPlaces(res);
+    showIntermediateResults(res);
+    //let res = prepareResultsForRender(pilots, rules, 1);
+    //mainWindow.webContents.send('show-results', { results : res, round : raceLoop });
 }
 
-function preparePreraceData() {
-    let data = {
-        group: [],
-    };
-
-    data.groupCur = groupCur;
-    if( rules[ global.settings.rules ].groups===1 &&  rules[ global.settings.rules ].showNext===0) data.showGroup=0;
-    else data.showGroup=1;
-    data.loop = raceLoop;
-    data.maxLoops = global.settings.raceLoops;
-    if( rulesFunc[ global.settings.rules ].fRaceName !== undefined)  {
-        data.raceName = rulesFunc[ global.settings.rules ].fRaceName(raceLoop);
-    }
-    else data.raceName ='';
-
-
-    for( let i=0; i<global.settings.groups[groupCur].length; i++ ){
-        data.group[i] = {};
-        data.group[i].name = global.settings.groups[groupCur][i]['Name'];
-        data.group[i].channel = global.settings.groups[groupCur][i]['Channel'];
-        data.group[i].resultTxt = '';
-        console.log( rules[ global.settings.rules ].saveLaps );
-        if( rules[ global.settings.rules ].saveLaps ) {
-            let pilot = global.settings.pilots[global.settings.groups[groupCur][i]['Num']];
-            let results = [];
-            let sum=0;
-            for( let j = 0; j < raceLoop; j++) {
-                if (pilot.Results[j] !== undefined && pilot.Results[j] !== null) {
-                    //data.group[i].results.push(pilot.Results[j].laps);
-                    results.push(pilot.Results[j].laps);
-                    sum += pilot.Results[j].laps;
-                }
-                if( results.length>0) {
-                    data.group[i].resultTxt = results.join('-');
-                    data.group[i].resultTxt += ' : ' + sum + 'к';
-                }
-            }
-        }
-        else if( rules[ global.settings.rules ].savePlace ){
-            let pilot = global.settings.pilots[global.settings.groups[groupCur][i]['Num']];
-            let results = [];
-            for( let j = 0; j < raceLoop; j++) {
-                if (pilot.Results[j] !== undefined && pilot.Results[j] !== null) {
-                    results.push(pilot.Results[j].pos);
-                }
-                if( results.length>0) {
-                    data.group[i].resultTxt = results.join('-');
-                    data.group[i].resultTxt = 'м ' + data.group[i].resultTxt;
-                }
-            }
-
-        }
-    }
-
-    let groupNext = groupCur + 1;
-    let groupMax = global.settings.groups.length;
-    if( groupNext >= groupMax ) groupNext = 0;
-    data.showNext = rules[ global.settings.rules ].showNext;
-    if( rules[ global.settings.rules ].showNext ) {
-        data.groupNext = [];
-        for( let i=0; i<global.settings.groups[groupNext].length; i++ ){
-            data.groupNext[i] = {};
-            data.groupNext[i].name = global.settings.groups[groupNext][i]['Name'];
-        }
-    }
-
-    data.groupsQty = global.settings.groups.length;
-    data.wawGroup = rules[ global.settings.rules ].wavNextNum;
-
-    return data;
-}
 
 function startPrerace(){
-    inRace = 0;
-    pause = 0;
-
-
+    race.inRaceOff();
+    race.unpause();
     clearInterval(timeInterval);
-    mainWindow.webContents.send('show-prerace', { data: preparePreraceData() });
-
-    if( global.settings.obsUse ) {
-        changeSceneObs( global.settings.obsSceneWR);
-    }
-    console.log( 'Invitation G'+(groupCur+1)+'/'+global.settings.groups.length+' L'+(raceLoop+1)+'/'+global.settings.raceLoops);
-
-
-    if(  global.settings.prepareTimer!==0 )  {
+    if( race.settings.prepareTimer!==0 )  {
         let fn;
-        if ( global.settings.raceTimer !==0) fn = startRace;
-        initializeClock('prepare-timer', global.settings.prepareTimer, fn);
+        if ( race.settings.raceTimer !==0 ) fn = startRace;
+        initializeClock( race.settings.prepareTimer, fn );
     }
+
+    mainWindow.webContents.send('show-prerace', { data: race.preparePreraceData() });
+
+    if( race.settings.obsUse ) {
+        obs.changeScene( race.settings.obsSceneWR);
+    }
+    console.log( 'Invitation G'+(race.groupCur+1)+'/'+race.groups.length+' L'+(race.raceLoop+1)+'/'+race.settings.raceLoops);
     console.log( 'startPrerace is completed');
 }
 
 
-function addPreraceTime() {
-    timerCur+=60;
-    console.log( 'Добавленно 60 секунд на подготовку');
-}
 
-function pausePrerace() {
-    if(pause) {
-        pause = 0;
-        mainWindow.webContents.send('timer-value', timerCur);
-        console.log( 'Продолжаем' );
-    }
-    else {
-        pause=1;
-        mainWindow.webContents.send('timer-value', 'II');
-        console.log( 'Пауза' );
+function switchPausePrerace() {
+    if( !race.inRace ) {
+        let val = race.switchPreracePause();
+        mainWindow.webContents.send('timer-value', val);
     }
 }
-
-
-// перевести пилотов полученных из XLS / настроек в массив [группа] = [пилот1], [пилот2], ...
-// XLS
-// Num - id 1..X для удобства
-// Name
-// Channel - для удобства - чтобы мы могли записать пилота с одним рабочим каналом в нужную ячейку
-// Группа - 1..Z
-
-function preparePilotsGroups(pilotsObj, rulesNum) {
-    let pilotsG = [];
-    if( pilotsObj === undefined ) return pilotsG;
-
-    if( rulesFunc[ rulesNum ].fGroupsOnLoad !== undefined && pilotsObj.length>=rules[rulesNum].minPilots && pilotsObj.length<=rules[rulesNum].maxPilots) {
-        pilotsG = rulesFunc[ rulesNum ].fGroupsOnLoad(pilotsObj);
-    }
-    else {
-        //стандартное заполнение групп по данным из pilots
-        for (let i = 0; i < pilotsObj.length; i++) {
-            //Создать группу
-            if (pilotsG[pilotsObj[i]['Group']] === undefined) {
-                pilotsG[pilotsObj[i]['Group']] = [];
-            }
-            //Добавить пилота в группу
-            pilotsG[pilotsObj[i]['Group']].push(pilotsObj[i]);
-        }
-        // Удалить пустые группы - сделать порядок 0,1...
-        for (let i = 0; i < pilotsG.length; i++) {
-            if (pilotsG[i] === undefined) pilotsG.splice(i, 1);
-        }
-    }
-    // pilotsG[group]{Name, Chanel, Group, Num}
-    return pilotsG;
-}
-
-// Назначить судей
-/*todo доработать*/
-function addJudges(pilotsObj, rulesNum) {
-    if (rulesFunc[rulesNum].fJudges !== undefined) return rulesFunc[rulesNum].fJudges(pilotsObj);
-    else {
-        for (let i = 0; i < pilotsObj.length; i++) {
-            if (i < 4) {
-                if (pilotsObj[i + pilotsObj.length - 4]['Name'] !== undefined)
-                    pilotsObj[i]['Judges'] = pilotsObj[i + pilotsObj.length - 4]['Name'];
-                else
-                    pilotsObj[i]['Judges'] = '-';
-            } else {
-                if (pilotsObj[i - 4]['Name'] !== undefined)
-                    pilotsObj[i]['Judges'] = pilotsObj[i - 4]['Name'];
-                else
-                    pilotsObj[i]['Judges'] = '-';
-            }
-        }
-        return pilotsObj;
-    }
-}
-
-/*
-Отправить сообщение OSC
- */
-const sendOsc = function (addr, arg1) {
-    console.log('OSC TX: ' + addr + ' ' + arg1);
-    client.send(addr, arg1);
-};
-
-/*
-Отправить имя пилота в TVP
- */
-const sendPilotName = function (camid, name) {
-    sendOsc('/v1/camera/' + camid + '/label', name.toString());
-};
-
-const onCamera = function (camid) {
-    sendOsc('/v1/camera/' + camid + '/display', 'on');
-};
-
-const offCamera = function (camid) {
-    sendOsc('/v1/camera/' + camid + '/display', 'off');
-};
-
-
-const sendStartCommand = function () {
-    sendOsc('/v1/startrace', 1);
-};
-
-const sendRaceDuration = function (sec) {
-    sendOsc('/v1/setdurasecs', sec);
-};
-
-const sendRaceLaps = function (num) {
-    if( num === 0 ) num=100; // если 0 - гонка в tvp финиширует мгновенно
-    sendOsc('/v1/setduralaps', num);
-};
 
 
 /**
@@ -1303,113 +660,7 @@ function isNumber(value) {
 }
 
 /*
-OBS - подключиться
- */
-async function connectObs(port, pass) {
-    await obs.connect({
-        address: 'localhost:'+port,
-        password: pass
-    })
-        .then(() => {
-            console.log(`OBS: We're connected & authenticated.`);
-
-            //return obs.send('GetSceneList');
-        })
-        /*.then(data => {
-            console.log(`${data.scenes.length} Available Scenes!`);
-            console.log('Using promises:', data);*/
-
-        /*data.scenes.forEach(scene => {
-            if (scene.name !== data.currentScene) {
-                console.log(`Found a different scene! Switching to Scene: ${scene.name}`);
-
-                obs.send('SetCurrentScene', {
-                    'scene-name': scene.name
-                });
-            }
-        });*/
-        /*})*/
-        .catch(err => { // Promise convention dicates you have a catch on every chain.
-            console.log(err);
-        });
-}
-
-/*
-OBS - сменить сцену
- */
-function changeSceneObs(name) {
-    obs.send('SetCurrentScene', {
-        'scene-name': name
-    }).then(r => console.log('OBS SetCurrentScene:', r));
-}
-
-/*
-Загрузка настроек из хранилища
- */
-function loadSettings() {
-    // global - эти переменные протаскиваются в рендер
-    global.settings.judges = store.get('judges', 0);
-    global.settings.withoutTVP = store.get('withoutTVP', 0);
-    global.settings.prepareTimer = store.get('prepareTimer', 120);
-    global.settings.raceTimer = store.get('raceTimer', 0);
-    global.settings.raceLaps = store.get('raceLaps', 0);
-    global.settings.pilots = store.get('pilots');
-    global.settings.raceLoops = store.get('raceLoops', 0);
-    global.settings.obsUse = store.get('obsUse', 0);
-    global.settings.obsPort = store.get('obsPort', 4444);
-    global.settings.obsPassword = store.get('obsPassword', '1234');
-    global.settings.obsSceneTVP = store.get('obsSceneTVP', 'tvp');
-    global.settings.obsSceneWR = store.get('obsSceneWR', 'wr');
-    global.settings.obsSceneBreak = store.get('obsSceneBreak', 'break');
-    global.settings.rules = store.get('rules', 1);
-    global.settings.groups = preparePilotsGroups(global.settings.pilots, global.settings.rules);
-    groupCur = store.get('groupCur',0);
-    raceLoop = store.get('raceLoop',0);
-    inCompetition = store.get('inCompetition', 0);
-
-}
-
-/*
-Запись значения настроек
- */
-function setSettings(arg) {
-    global.settings.judges=arg['judges'];
-    global.settings.withoutTVP=arg['withoutTVP'];
-    global.settings.rules=arg['rules'];
-    global.settings.prepareTimer=arg['prepareTimer'];
-    global.settings.raceTimer=arg['raceTimer'];
-    global.settings.raceLaps=arg['raceLaps'];
-    global.settings.raceLoops=arg['raceLoops'];
-    global.settings.obsUse=arg['obsUse'];
-    global.settings.obsPort=arg['obsPort'];
-    global.settings.obsPassword=arg['obsPassword'];
-    global.settings.obsSceneTVP=arg['obsSceneTVP'];
-    global.settings.obsSceneWR=arg['obsSceneWR'];
-    global.settings.obsSceneBreak=arg['obsSceneBreak'];
-    return 1;
-}
-
-/*
-Сохранение настроек в хранилище
- */
-function saveSettings(arg) {
-    store.set('judges', arg['judges']);
-    store.set('withoutTVP', arg['withoutTVP']);
-    store.set('rules', arg['rules']);
-    store.set('raceTimer', arg['raceTimer']);
-    store.set('raceLaps', arg['raceLaps']);
-    store.set('prepareTimer', arg['prepareTimer']);
-    store.set('raceLoops', arg['raceLoops']);
-    store.set('obsUse', arg['obsUse']);
-    store.set('obsPort', arg['obsPort']);
-    store.set('obsPassword', arg['obsPassword']);
-    store.set('obsSceneTVP', arg['obsSceneTVP']);
-    store.set('obsSceneWR', arg['obsSceneWR']);
-    store.set('obsSceneBreak', arg['obsSceneBreak']);
-}
-
-/*
-По дготовить имя файла для логов
+Подготовить имя файла для логов
  */
 function filenameDate() {
     let date = new Date();
@@ -1432,14 +683,15 @@ function filenameDate() {
     return yy + '-' + mm + '-' + dd + '--' + hh + '-' + min + '-' + ss;
 }
 
-function prepareResultsForRender(pilots, rules_num, final =0) {
+/* todo недоделана или на выброс?
+/*function prepareResultsForRender(pilots, rules_num, final =0) {
     let ret = [];
     //console.log( pilots);
     pilots.forEach( function(pilot, i) {
         ret[i] = {};
+        ret[i].Id = i;
         ret[i].Name = pilot.Name;
         ret[i].Results = [];
-        if( final ) ret[i].Sums = { pos:0, laps:0, time:0 };
         ret[i].Sums = { pos:0, laps:0, time:0 };
         for(let j = 0; j < raceLoop; j++){
             ret[i].Results[j] = { pos:false, laps:false, time:false };
@@ -1447,7 +699,7 @@ function prepareResultsForRender(pilots, rules_num, final =0) {
                 if (rules[rules_num].savePlace) ret[i].Results[j].pos = pilot.Results[j].pos;
                 if (rules[rules_num].saveTime) ret[i].Results[j].time = pilot.Results[j].time;
                 if (rules[rules_num].saveLaps) ret[i].Results[j].laps = pilot.Results[j].laps;
-                if( final )
+//                if( final )
                 {
                     ret[i].Sums.pos += pilot.Results[j].pos;
                     ret[i].Sums.time += pilot.Results[j].time;
@@ -1463,9 +715,14 @@ function prepareResultsForRender(pilots, rules_num, final =0) {
             ret = rulesFunc[rules_num].fFinalPos(ret);
         }
     }
-    console.log( 'prepareResultsForRender:', ret );
+    else{
+        if( rules[rules_num].sortIntermediateResults !== undefined && rules[rules_num].sortIntermediateResults ){
+            ret = rulesFunc[rules_num].fFinalPos(ret);
+        }
+    }
+    //console.log( 'prepareResultsForRender:', ret );
     return ret;
-}
+}*/
 
 function compare(a, b) {
     if (a > b) return 1; // если первое значение больше второго
@@ -1473,72 +730,6 @@ function compare(a, b) {
     if (a < b) return -1; // если первое значение меньше второго
 }
 
-function getRulesName() {
-    return rules[ global.settings.rules ].name;
-}
-
-function posQualification( ret ) {
-    ret.sort( compareQ );
-    ret.forEach( function(res, i) {
-        ret[i].Sums.pos=i+1;
-    });
-    return ret;
-
-    function compareQ(a, b) {
-        if (a.Sums.laps < b.Sums.laps) return 1;
-        if (a.Sums.laps > b.Sums.laps) return -1;
-
-        // При равной сумме кругов учтем среднее время круга
-        // Если в каком-то раунде время = 0 ( пролетел 0 кругов), то ничего страшного
-        if (a.Sums.time < b.Sums.time ) return -1;
-        if (a.Sums.time === b.Sums.time ) return 0;
-        if (a.Sums.time > b.Sums.time ) return 1;
-    }
-
-}
-
-function posBattle4( ret ) {
-    ret.sort( compareB4 );
-    ret.forEach( function(res, i) {
-        ret[i].Sums.pos=i+1;
-    });
-    return ret;
-
-    function compareB4(a, b) {
-        if (a.Sums.pos > b.Sums.pos) return 1;
-        if (a.Sums.pos < b.Sums.pos) return -1;
-
-        // При равной сумме кругов учтем среднее время круга
-        // Если в каком-то раунде время = 0 ( пролетел 0 кругов), то ничего страшного
-        if (a.Sums.time > b.Sums.time ) return -1;
-        if (a.Sums.time === b.Sums.time ) return 0;
-        if (a.Sums.time < b.Sums.time ) return 1;
-    }
-}
-
-// присудить места по завершению DE8
-function posDE8( ret ) {
-    // 2 - p3 -> 7, p4 -> 8,
-    // 4 - p3 -> 5, p4 -> 6
-    // 5 - p1..4
-    //присваиваем места
-    ret[findPilotInLoop(ret, 2, 4)].Sums.pos=8;
-    ret[findPilotInLoop(ret, 2, 3)].Sums.pos=7;
-    ret[findPilotInLoop(ret, 4, 4)].Sums.pos=6;
-    ret[findPilotInLoop(ret, 4, 3)].Sums.pos=5;
-    ret[findPilotInLoop(ret, 5, 4)].Sums.pos=4;
-    ret[findPilotInLoop(ret, 5, 3)].Sums.pos=3;
-    ret[findPilotInLoop(ret, 5, 2)].Sums.pos=2;
-    ret[findPilotInLoop(ret, 5, 1)].Sums.pos=1;
-    //сортируем по возрастанию
-    ret.sort( compareDE8 );
-    return ret;
-
-    function compareDE8(a, b) {
-        if (a.Sums.pos > b.Sums.pos) return 1;
-        if (a.Sums.pos < b.Sums.pos) return -1;
-    }
-}
 
 // Костыль. Приложение падает под виндой. Пробовал обновлять Node, electron, electron-packager, wine
 function playSoundCountOnWin() {
