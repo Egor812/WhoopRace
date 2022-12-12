@@ -3,7 +3,7 @@
 <head>
   <title>Whoop Race</title>
   <link rel="stylesheet" href="./stylesheets/bootstrap.min.css">
-  <link rel="stylesheet" href="./stylesheets/style.css">
+  <link id="theme" rel="stylesheet" href="./stylesheets/style1.css">
 </head>
 
 <body>
@@ -235,15 +235,24 @@
 
       <a href="#" id="getXLSTemplate">Получить XLS шаблон</a>
 
+      <div>
+        <label for="themeSelector" class="col-form-label">Тема </label>
+        <select class="form-select" id="themeSelector">
+          <option value="1" data-theme="style1.css">Синяя</option>
+          <option value="2" data-theme="style2.css">Контрастная</option>
+          <option value="3" data-theme="style3.css">Крупная</option>
+        </select>
+      </div>
+
     </div>
   </div>
 </div>
 
 
 <div id="race" style="display: none">
-    <div id="group" class="badge badge-info" style="font-size: 1.5em;text-align: right;margin-bottom: 0;"> </div>
-    <div id="round" class="badge badge-secondary" style="font-size: 1.5em;text-align: right;margin-bottom: 0;"> </div>
-    <div id="round-name" class="badge badge-secondary" style="font-size: 1.5em;margin-bottom: 0; margin-top: 4px;display:none"> </div>
+    <div id="group" class="badge badge-info"> </div>
+    <div id="round" class="badge badge-secondary"> </div>
+    <div id="round-name" class="badge badge-secondary" style="display:none"> </div>
     <div id="group-pilots" class="row">
         <div id="pilot-1" class="pilots col">
           <span class='name'></span>

@@ -63,6 +63,7 @@ module.exports = class Race {
 
     pilots; // массив пилотов
     groups; // массив групп пилотов
+    //todo groups - массив pilots. Избыточная дублирующаяся информация. Вроде, сейчас используется только Num и Name
     raceLoop; // текущий раунд
     groupCur; // текущая группа
     inCompetition; // создана ли гонка
@@ -83,10 +84,6 @@ module.exports = class Race {
        this.inCompetition =0;
        this.groups = [];
 
-       /*this.pilots = pilots;
-       this.raceLoop = raceLoop;
-       this.rules = rules;
-*/
     }
 
     loadSettings() {
@@ -106,8 +103,6 @@ module.exports = class Race {
         this.settings.rules_num = this.store.get('rules_num', 1);
         this.settings.channels = this.store.get('channels', ['R1', 'R2', 'R4', 'R5']);
 
-        //let rules = new rulesList[x](x)
-        //this.rules = new rulesList[ this.settings.rules_num]( this.settings.rules_num);
         this.rules = new rules.rulesList[ this.settings.rules_num]( rules.rulesParams[this.settings.rules_num]);
         console.log( 'rules loaded: ', this.rules );
         this.pilots = this.store.get('pilots');
@@ -138,6 +133,9 @@ module.exports = class Race {
     {
         let ret = [];
         //console.log( pilots);
+        let savePlace = this.rules.savePlace;
+        let saveTime = this.rules.saveTime;
+        let saveLaps = this.rules.saveLaps;
         this.pilots.forEach( function(pilot, i) {
             ret[i] = {};
             ret[i].Id = i;
@@ -147,10 +145,10 @@ module.exports = class Race {
             for(let j = 0; j < this.raceLoop; j++){
                 ret[i].Results[j] = { pos:false, laps:false, time:false };
                 if( pilot.Results[j] !== undefined && pilot.Results[j] !== null ) {
-                    if (this.rules.savePlace) ret[i].Results[j].pos = pilot.Results[j].pos;
-                    if (this.saveTime) ret[i].Results[j].time = pilot.Results[j].time;
-                    if (this.saveLaps) ret[i].Results[j].laps = pilot.Results[j].laps;
-                    ret[i].Sums.pos += pilot.Results[j].pos;
+                    if (savePlace) ret[i].Results[j].pos = pilot.Results[j].pos;
+                    if (saveTime) ret[i].Results[j].time = pilot.Results[j].time;
+                    if (saveLaps) ret[i].Results[j].laps = pilot.Results[j].laps;
+                    //ret[i].Sums.pos += pilot.Results[j].pos;
                     ret[i].Sums.time += pilot.Results[j].time;
                     ret[i].Sums.laps += pilot.Results[j].laps;
                 }
@@ -164,11 +162,11 @@ module.exports = class Race {
             }
         }
         else{
-            if( this.rules.sortIntermediateResults !== undefined && this.rules.sortIntermediateResults ){
-                ret = this.rules.calcFinalPositions(ret);
+            if( this.rules.calcIntermediatePositions !== undefined){
+                ret = this.rules.calcIntermediatePositions(ret, this.raceLoop);
             }
         }
-        //console.log( 'prepareResultsForRender:', ret );
+        console.log( 'calcIntermediateResults:', JSON.stringify(ret) );
         return ret;
     }
 
@@ -296,7 +294,7 @@ module.exports = class Race {
     setSettings(arg) {
         this.settings.judges=arg['judges'];
         this.settings.withoutTVP=arg['withoutTVP'];
-        this.settings.rules_num=arg['rules'];
+        this.settings.rules_num=arg['rules_num'];
         this.settings.prepareTimer=arg['prepareTimer'];
         this.settings.raceTimer=arg['raceTimer'];
         this.settings.raceLaps=arg['raceLaps'];
@@ -343,7 +341,7 @@ module.exports = class Race {
     }
 
     saveRules() {
-        this.store.set('rules', this.settings.rules_num);
+        this.store.set('rules_num', this.settings.rules_num);
     }
 
     saveCurrentGroup()
@@ -381,12 +379,11 @@ module.exports = class Race {
         return true;
     }
 
-    processFormSettings( raceLoops)
+    processFormSettings( settings )
     {
         // если в правилах записаны loops - это приоритетней данных из формы
-        // todo можно ли перевести на this.rules.loops ?
-        if( rules.rulesParams[ this.settings.rules_num ].loops !== undefined ) raceLoops = rules.rulesParams[ this.settings.rules_num ].loops;
-        return raceLoops;
+        if( rules.rulesParams[ this.settings.rules_num ].loops !== undefined ) settings.raceLoops = rules.rulesParams[ this.settings.rules_num ].loops;
+        return settings;
     }
 
 
@@ -396,7 +393,7 @@ module.exports = class Race {
     saveSettings(arg) {
         this.store.set('judges', arg['judges']);
         this.store.set('withoutTVP', arg['withoutTVP']);
-        this.store.set('rules', arg['rules']);
+        this.store.set('rules', arg['rules_num']);
         this.store.set('raceTimer', arg['raceTimer']);
         this.store.set('raceLaps', arg['raceLaps']);
         this.store.set('prepareTimer', arg['prepareTimer']);
@@ -469,6 +466,20 @@ module.exports = class Race {
             console.log( 'Пауза' );
             return( 'II');
         }
+    }
+
+    // Проверим, что в форме нет одинаковых занятых мест, если они важны
+    validateRaceResultsFromForm( arg )
+    {
+        // arg[0..3].laps .pos .time
+        if( this.rules.savePlace === 0) return 1;
+        for( let i=0; i<this.groups[this.groupCur].length; i++ ){
+            if( arg[i].pos < 1 || arg[i].pos>4) return 0;
+            for( let j = i+1; j < this.groups[this.groupCur].length; j++) {
+                if(arg[i].pos === arg[j].pos) return 0;
+            }
+        }
+        return 1;
     }
 
     setAndSaveRaceResultsFromForm( arg )
@@ -564,7 +575,7 @@ module.exports = class Race {
 
         for( let i=0; i<this.groups[this.groupCur].length; i++ ){
             data.group[i] = {};
-            data.group[i].name = this.groups[this.groupCur][i]['Name'];
+            data.group[i].name = this.groups[this.groupCur][i]['Name']; //todo можно перевести на this.pilots
             data.group[i].channel = this.settings.channels[i];
             data.group[i].resultTxt = ['', ''];
             console.log( this.rules.saveLaps );
@@ -597,7 +608,7 @@ module.exports = class Race {
                 }
                 if( results.length>0) {
                     data.group[i].resultTxt[0] = results.join('-');
-                    data.group[i].resultTxt[0] = 'м ' + data.group[i].resultTxt;
+                    data.group[i].resultTxt[0] = 'м ' + data.group[i].resultTxt[0];
                 }
 
             }
@@ -611,7 +622,7 @@ module.exports = class Race {
             data.groupNext = [];
             for( let i=0; i<this.groups[groupNext].length; i++ ){
                 data.groupNext[i] = {};
-                data.groupNext[i].name = this.groups[groupNext][i]['Name'];
+                data.groupNext[i].name = this.groups[groupNext][i]['Name']; //todo можно перевести на this.pilots
             }
         }
 

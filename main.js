@@ -2,15 +2,7 @@
 
 const isDev = process.env.APP_DEV ? (process.env.APP_DEV.trim() === "true") : false;
 
-//global.settings = {};
-//global.settings.pilots[n] { Num, Name, Channel, Group, Results[m]{pos, time, laps }
-//global.settings.groups[group][n] { Num, Name, Channel, ... }
-
-//let timerCur; // текущее значение таймера
-//let groupCur; // текущая группа пилотов
 let timeInterval; // таймер race и prerace
-//let raceLoop=0; // номер прохода через все группы;
-
 
 const electron = require('electron');
 const main = electron.app;  // Модуль контролирующей жизненный цикл нашего приложения.
@@ -227,13 +219,15 @@ ipcMain.handle( 'repackGroups', async (event, arg) =>{
 ipcMain.handle( 'submit-race', async (event, arg)=> {
     const { dialog } = require('electron');
 
+    console.log('submit-race input');
+    console.log(arg);
     arg = race.processFormSettings(arg);
     race.setSettings(arg);
     if( !race.arePilotsPresent() ) {
         dialog.showErrorBox('Ошибка', 'Загрузите пилотов');
         return false;
     }
-    if( !race.checkRulesPilotsAmount(arg.rules) ) {
+    if( !race.checkRulesPilotsAmount(arg.rules_num) ) {
         dialog.showErrorBox('Ошибка', 'Количество пилотов не соответствует выбранным правилам');
         return false;
     }
@@ -330,12 +324,12 @@ ipcMain.on( 'add-prerace-time',  ()=> {
     return 1
 });
 
-ipcMain.on( 'pause-prerace',  ()=> {
+ipcMain.on( 'switch-pause-prerace',  ()=> {
     switchPausePrerace();
     return 1
 });
 
-ipcMain.on( 'pause-results',  ()=> {
+ipcMain.on( 'switch-pause-results',  ()=> {
     switchPausePrerace();
     return 1
 });
@@ -352,7 +346,13 @@ ipcMain.on( 'screenshot-results',  (event, arg)=> {
 ipcMain.on( 'get-stat',  ()=> {
     if( race.isLastRaceLoop() ) {
         //ИТОГОВЫЙ ИТОГ
-        showFinalResults( race.settings.pilots, race.rules );
+        if( race.areResultsNeeded() ) {
+            let res = race.calcIntermediateResults(1);
+            showFinalResults( res );
+        }
+        else{
+            showRaceEnd();
+        }
     }
     else{
         //промежуточный итог
@@ -381,15 +381,21 @@ ipcMain.on( 'get-results',  ( event, arg )=> {
     console.log('get-results pilots: ', race.settings.pilots);
     console.log('get-results groups: ', race.groups);
     console.log('get-result: ', race.groupCur);
-    race.setAndSaveRaceResultsFromForm(arg['results']);
+    if ( race.validateRaceResultsFromForm(arg['results']) ){
+        race.setAndSaveRaceResultsFromForm(arg['results']);
 
-    let fs = require('fs');
-    fs.writeFile( './results/'+filenameDate()+'.txt', JSON.stringify(arg['results']), function (err) {
-        if (err) return console.log(err);
-        console.log('Резултаты записаны в файл');
-    });
-    nextRace(); // хотел передать имя этой функции сюда как текстовый аргумент, но не получилось вызвать функцию
-    // изучить - https://ru.stackoverflow.com/questions/412715/%D0%97%D0%B0%D0%BF%D1%83%D1%81%D0%BA-%D1%84%D1%83%D0%BD%D0%BA%D1%86%D0%B8%D0%B8-%D0%BF%D0%BE-%D0%B7%D0%BD%D0%B0%D1%87%D0%B5%D0%BD%D0%B8%D1%8E-%D0%BF%D0%B5%D1%80%D0%B5%D0%BC%D0%B5%D0%BD%D0%BD%D0%BE%D0%B9
+        let fs = require('fs');
+        fs.writeFile( './results/'+filenameDate()+'.txt', JSON.stringify(arg['results']), function (err) {
+            if (err) return console.log(err);
+            console.log('Резултаты записаны в файл');
+        });
+        nextRace(); // хотел передать имя этой функции сюда как текстовый аргумент, но не получилось вызвать функцию
+        // изучить - https://ru.stackoverflow.com/questions/412715/%D0%97%D0%B0%D0%BF%D1%83%D1%81%D0%BA-%D1%84%D1%83%D0%BD%D0%BA%D1%86%D0%B8%D0%B8-%D0%BF%D0%BE-%D0%B7%D0%BD%D0%B0%D1%87%D0%B5%D0%BD%D0%B8%D1%8E-%D0%BF%D0%B5%D1%80%D0%B5%D0%BC%D0%B5%D0%BD%D0%BD%D0%BE%D0%B9
+    }
+    else {
+        switchPausePrerace();
+        initializeClock( 2, saveRaceReq);
+    }
 });
 
 function takeScreenshot( x, y, width, height) {
@@ -534,7 +540,6 @@ function finishRace(stat = null)
     // если нужны результаты
     if( race.areResultsNeeded() ){
         console.log( 'finishRace: ', stat );
-        console.log( 'finishRace: ', race.rules );
         if( race.settings.withoutTVP )  stat = null;
 
         mainWindow.webContents.send('editresults', { stat : stat, rules : race.rules });
@@ -567,6 +572,14 @@ function showIntermediateResults( res ) {
     mainWindow.webContents.send('show-results', { results : res, round : race.raceLoop, raceLoops: race.settings.raceLoops });
 }
 
+function showRaceEnd() {
+    mainWindow.webContents.send('show-results', { results : false, round : race.raceLoop, raceLoops: race.settings.raceLoops  });
+}
+
+function showFinalResults( res ) {
+    mainWindow.webContents.send('show-results', { results : res, round : race.raceLoop, raceLoops: race.settings.raceLoops });
+}
+
 
 function nextRace() {
     // переключить группу
@@ -575,10 +588,13 @@ function nextRace() {
         if( race.isCompetitionOver() ) {
             //ИТОГОВЫЙ ИТОГ
             if( race.areResultsNeeded() ) {
-                showFinalResults( race.settings.pilots, race.settings.rules );
+                let res = race.calcIntermediateResults(1);
+                race.setPilotsPlaces(res);
+                race.savePilots();
+                showFinalResults( res );
             }
             else{
-                mainWindow.webContents.send('show-results', { results : false, round : race.raceLoop, raceLoops: race.settings.raceLoops  });
+                showRaceEnd();
             }
         }
         else{
@@ -603,14 +619,6 @@ function nextRace() {
 }
 
 
-// todo недописана?
-function showFinalResults( pilots, rules ) {
-    let res = race.calcIntermediateResults(1);
-    //race.setPilotsPlaces(res);
-    showIntermediateResults(res);
-    //let res = prepareResultsForRender(pilots, rules, 1);
-    //mainWindow.webContents.send('show-results', { results : res, round : raceLoop });
-}
 
 
 function startPrerace(){

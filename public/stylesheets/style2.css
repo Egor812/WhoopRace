@@ -1,0 +1,153 @@
+body {
+    font-family: "Lucida Grande", Helvetica, Arial, sans-serif;
+    background: black;
+    color: white;
+}
+
+a {
+    color: #00B7FF;
+}
+
+#menu{
+    padding: 50px;
+    margin: 10px  250px;
+    background: black;
+}
+
+#race{
+    padding: 50px;
+    margin: 10px  250px;
+}
+
+#results{
+    padding: 50px 100px;
+}
+
+.setup-pilots-badge{
+    margin: 5px 5px 5px 5px;
+    padding: 5px 10px 5px 10px;
+}
+
+.results-pilots-badge{
+    margin: 5px 5px 5px 5px;
+    padding: 5px 10px 5px 10px;
+}
+
+.pilots{
+    border-radius: 6px;
+    margin:0.5em;
+    height: 150px;
+    background: black;
+    border-color: white;
+    border-style: solid;
+}
+
+.pilots > .name {
+    font-size: 3em;
+    font-weight: bold;
+}
+
+.pilots > .ch{
+    margin:3px;
+}
+
+.pilots > .judge{
+    margin:3px;
+}
+
+.pilots > .stat{
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    font-size: medium;
+    padding-left: 15px;
+    margin-bottom: 6px;
+    color: lightslategray;
+}
+
+.pilots > .place{
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    font-size: medium;
+    padding-right: 8px;
+    margin-bottom: 6px;
+    color: lightslategray;
+}
+
+
+.top {
+    position: absolute;
+    top: 0;
+    right: 0;
+}
+
+.bottom {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+}
+
+#prepare-timer{
+    color: lightskyblue;
+}
+
+#race-timer{
+    color: red;
+}
+
+.timer{
+    font-size: 12em;
+    text-align: center;
+    font-weight: bold;
+}
+
+
+#group-pilots{
+    padding:1em
+}
+
+#group-next{
+    color:lightgray;
+    padding: 1em 0 1em 0;
+    font-size: 1.5em;
+}
+
+.helptable > .col{
+    border-bottom: 1px solid rgb(124 61 61);
+}
+
+.rulesInfo{
+    color:darkgray;
+}
+
+.result-cell{
+    margin-right:16px;
+    display: inline-block;
+}
+
+.result-table-intermediate, .result-table-final{
+    display: inline-block;
+    width: 120px;
+    border-bottom-width: 1px;
+    border-bottom-style: solid;
+    border-bottom-color: midnightblue;
+}
+
+#group{
+    font-size: 3em;
+    text-align: right;
+    margin-bottom: 0;
+}
+
+#round{
+    font-size: 3em;
+    text-align: right;
+    margin-bottom: 0;
+}
+
+#round-name{
+    font-size: 3em;
+    margin-bottom: 0;
+    margin-top: 4px;
+}

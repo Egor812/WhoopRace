@@ -125,7 +125,29 @@ color:lightgray;
   display: inline-block;
 }
 
-.result-table-intermediate{
+.result-table-intermediate, .result-table-final{
   display: inline-block;
   width: 120px;
+  border-bottom-width: 1px;
+  border-bottom-style: solid;
+  border-bottom-color: midnightblue;
 }
+
+#group{
+  font-size: 1.5em;
+  text-align: right;
+  margin-bottom: 0;
+}
+
+#round{
+  font-size: 1.5em;
+  text-align: right;
+  margin-bottom: 0;
+}
+
+#round-name{
+  font-size: 1.5em;
+  margin-bottom: 0;
+  margin-top: 4px;
+}
+

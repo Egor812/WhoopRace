@@ -86,6 +86,18 @@ class rules
         return false;
     }
 
+    /*
+{"Id":0,"Name":"John","Results":[{"pos":false,"laps":false,"time":false},{"pos":2,"laps":false,"time":0}],"Sums":{"pos":2,"laps":0,"time":0}},
+{"Id":1,"Name":"Tom","Results":[{"pos":1,"laps":false,"time":0},{"pos":false,"laps":false,"time":false}],"Sums":{"pos":1,"laps":0,"time":0}},
+{"Id":2,"Name":"John","Results":[{"pos":2,"laps":false,"time":0},{"pos":false,"laps":false,"time":false}],"Sums":{"pos":2,"laps":0,"time":0}},
+{"Id":3,"Name":"Tom","Results":[{"pos":false,"laps":false,"time":false},{"pos":4,"laps":false,"time":0}],"Sums":{"pos":4,"laps":0,"time":0}},
+{"Id":4,"Name":"John","Results":[{"pos":3,"laps":false,"time":0},{"pos":false,"laps":false,"time":false}],"Sums":{"pos":3,"laps":0,"time":0}},
+{"Id":5,"Name":"Tom","Results":[{"pos":false,"laps":false,"time":false},{"pos":1,"laps":false,"time":0}],"Sums":{"pos":1,"laps":0,"time":0}},
+{"Id":6,"Name":"John","Results":[{"pos":4,"laps":false,"time":0},{"pos":false,"laps":false,"time":false}],"Sums":{"pos":4,"laps":0,"time":0}},
+{"Id":7,"Name":"Tom","Results":[{"pos":false,"laps":false,"time":false},{"pos":3,"laps":false,"time":0}],"Sums":{"pos":3,"laps":0,"time":0}}]
+
+     */
+
     /*findPilotInGroup(group, loop, place) {
         for (let i = 0, len =  global.settings.groups[group].length; i < len; i++) {
             if (global.settings.pilots[ global.settings.groups[group][i].Num ].Results[loop].pos === place) {
@@ -109,6 +121,7 @@ class rulesQualification extends rules
         this.sortIntermediateResults = params.sortIntermediateResults;
     }
 
+    // квалификация
     calcFinalPositions( ret )
     {
         ret.sort( compareQ );
@@ -127,6 +140,10 @@ class rulesQualification extends rules
             if (a.Sums.time === b.Sums.time ) return 0;
             if (a.Sums.time > b.Sums.time ) return 1;
         }
+    }
+
+    calcIntermediatePositions( ret, loops){
+        return this.calcFinalPositions(ret);
     }
 }
 
@@ -228,6 +245,7 @@ class rulesDoubleElemenation8 extends rules
         // 2 - p3 -> 7, p4 -> 8,
         // 4 - p3 -> 5, p4 -> 6
         // 5 - p1..4
+        // loop 0..5
         //присваиваем места
         ret[this.findPilotInLoop(ret, 2, 4)].Sums.pos=8;
         ret[this.findPilotInLoop(ret, 2, 3)].Sums.pos=7;
@@ -245,6 +263,29 @@ class rulesDoubleElemenation8 extends rules
             if (a.Sums.pos > b.Sums.pos) return 1;
             if (a.Sums.pos < b.Sums.pos) return -1;
         }
+    }
+
+    calcIntermediatePositions(ret, loop){
+        //console.log('loop'+loop);
+        //console.log(JSON.stringify(ret));
+        loop--;
+
+        switch( loop ) {
+            case 5:
+                ret[this.findPilotInLoop(ret, 5, 4)].Sums.pos=4;
+                ret[this.findPilotInLoop(ret, 5, 3)].Sums.pos=3;
+                ret[this.findPilotInLoop(ret, 5, 2)].Sums.pos=2;
+                ret[this.findPilotInLoop(ret, 5, 1)].Sums.pos=1;
+            case 4:
+                ret[this.findPilotInLoop(ret, 4, 4)].Sums.pos=6;
+                ret[this.findPilotInLoop(ret, 4, 3)].Sums.pos=5;
+            case 3:
+            case 2:
+                ret[this.findPilotInLoop(ret, 2, 4)].Sums.pos=8;
+                ret[this.findPilotInLoop(ret, 2, 3)].Sums.pos=7;
+        }
+        return ret;
+
     }
 
     setJudges(pilots) {
@@ -298,7 +339,11 @@ class rulesBattle4 extends rules
             if (a.Sums.time < b.Sums.time ) return 1;
         }
     }
-};
+
+    calcIntermediatePositions( ret, loops){
+        return this.calcFinalPositions(ret);
+    }
+}
 
 /*const rulesFunc=[];
 rulesFunc[1] = {};

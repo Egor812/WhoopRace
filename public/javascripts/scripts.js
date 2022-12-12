@@ -7,7 +7,8 @@ const elmMenu = $('#menu');
 const elmResults = $('#results');
 const elmRerace = $('#rerace');
 const elmStartNow = $('#start-now');
-const contextMenu = 0;
+let contextMenu; // открыто любое контекстное меню
+//let invalidResults = 0;
 
 function showMenu(settings, inCompetition, raceLoop, groupCur, rulesName) {
     setSettings(settings);
@@ -177,7 +178,10 @@ function race(rules, win32, raceTimer, withoutTVP)
             $('#gpp-' + (i+1)).val(0);
             $('#gpl-' + (i+1)).val(0);
             $('#gpt-' + (i+1)).val(0);
-            if (!rules.savePlace) $('#gpp-' + (i + 1)).hide(); else $('#gpp-' + (i + 1)).show();
+            if (!rules.savePlace) $('#gpp-' + (i + 1)).hide(); else {
+                $('#gpp-' + (i + 1)).css("color", "red");
+                $('#gpp-' + (i + 1)).show();
+            }
             if (!rules.saveLaps) $('#gpl-' + (i + 1)).hide(); else $('#gpl-' + (i + 1)).show();
             if (!rules.saveTime) $('#gpt-' + (i + 1)).hide(); else $('#gpt-' + (i + 1)).show();
         }
@@ -228,7 +232,10 @@ function showResults(data, loop, raceLoops) {
         return;
     }
 
-    document.getElementById('result-round').innerHTML= `Раунд ${(loop)}/${raceLoops}`;
+    if( loop === raceLoops)
+        document.getElementById('result-round').innerHTML= `Раунд ${(loop)}/${raceLoops} Гонка завершена`;
+    else
+        document.getElementById('result-round').innerHTML= `Раунд ${(loop)}/${raceLoops}`;
 
     const HTMLOUT = document.getElementById('result-table');
     let x='';
@@ -239,16 +246,29 @@ function showResults(data, loop, raceLoops) {
         for(let i = 0; i < len; i++){
             x += '<span class="result-table-intermediate">';
             if( pilot.Results[i] !== undefined) {
-                if (pilot.Results[i].laps !== false) x += '<span class="result-cell" style="width: 20px;">' + pilot.Results[i].laps + '</span>';
-                if (pilot.Results[i].pos !== false) x += '<span class="result-cell" style="width: 20px;">' + pilot.Results[i].pos + '</span>';
-                if (pilot.Results[i].time !== false) x += '<span class="result-cell" style="width: 60px; color:gray;">' + pilot.Results[i].time + '</span>';
+                let a = '';
+                if (pilot.Results[i].laps !== false) a += '<span class="result-cell" style="width: 20px;">' + pilot.Results[i].laps + '</span>';
+                if (pilot.Results[i].pos !== false) a += '<span class="result-cell" style="width: 20px;">' + pilot.Results[i].pos + '</span>';
+                if (pilot.Results[i].time !== false) a += '<span class="result-cell" style="width: 60px; color:gray;">' + pilot.Results[i].time + '</span>';
+                if( a !== '' ) x += a;
+                else x += '&nbsp;';
+            }
+            else{
+                x += '&nbsp;';
             }
             x += '</span>';
         }
         if( typeof pilot.Sums !== 'undefined' ) {
             let style ='';
-            if( pilot.Sums.pos<=3 ) style='style="color:red"';
-            x += `<span class="result-table-final" ${style}>` + pilot.Sums.pos + '</span>';
+            if( pilot.Sums.pos>0 ) {
+                if (pilot.Sums.pos <= 3) style = 'style="color:red"';
+                x += `<span class="result-table-final" ${style}>` + pilot.Sums.pos;
+                if( pilot.Sums.laps !==0 ) x += ' <span style="font-size: smaller; color:gray;">('+pilot.Sums.laps+'к)</span>';
+                x += '</span>';
+            }
+            else{
+                x += '<span class="result-table-final">&nbsp;</span>';
+            }
         }
         x +='<br>';
     });
@@ -260,7 +280,6 @@ function showResults(data, loop, raceLoops) {
 }
 
 // Вывести группы пилотов в меню
-// pilotsG[][][Name, Channel, ]
 function showPilotsAll(pilotsG, channels) {
     console.log( pilotsG );
     if( pilotsG === undefined || pilotsG === false ) return;
@@ -285,6 +304,11 @@ function getFormRulesVal() {
     return Number($("#rulesSelector option:selected").val());
 }
 
+function getFormThemeVal() {
+    return $("#themeSelector option:selected").data("theme");
+}
+
+
 function rulesChangeRender()
 {
     $( ".rulesInfo" ).each(function() {
@@ -304,7 +328,7 @@ function setSettings(settings) {
     //if( settings['judges'] ) $('#checkbox-judge').prop('checked', true);
     if( settings['withoutTVP'] ) $('#checkbox-without-tvp').prop('checked', true);
     if( settings['obsUse'] ) $('#checkbox-obsUse').prop('checked', true);
-    if( settings['rules'] ) $('#rulesSelector option[value='+settings['rules']+']').attr('selected','selected');
+    if( settings['rules_num'] ) $('#rulesSelector option[value='+settings['rules_num']+']').attr('selected','selected');
     $('#obsPort').val(settings.obsPort);
     $('#obsPassword').val(settings.obsPassword);
     $('#obsSceneTVP').val(settings.obsSceneTVP);
@@ -340,7 +364,7 @@ function getSettingsFromForm(){
     let obsSceneWR = $('#obsSceneWR').val();
     let obsSceneBreak = $('#obsSceneBreak').val();
     let channels = [ $('#inputCh1').val(), $('#inputCh2').val(), $('#inputCh3').val(), $('#inputCh4').val() ];
-    return {judges: judges, withoutTVP: withoutTVP, prepareTimer: prepareTimer, raceTimer : raceTimer, raceLoops: raceLoops, rules: rules,
+    return {judges: judges, withoutTVP: withoutTVP, prepareTimer: prepareTimer, raceTimer : raceTimer, raceLoops: raceLoops, rules_num: rules,
         obsUse:obsUse, obsPort:obsPort, obsSceneTVP:obsSceneTVP, obsSceneWR:obsSceneWR, obsSceneBreak:obsSceneBreak, obsPassword:obsPassword,
         raceLaps:raceLaps, channels: channels};
 }
@@ -532,11 +556,11 @@ window.setup = window.setup || {}, // откуда я это взял? как э
 
             // пауза
             pausePreRace: function() {
-                ipcRenderer.send('pause-prerace');
+                ipcRenderer.send('switch-pause-prerace');
             },
 
             pauseResults: function() {
-                ipcRenderer.send('pause-results');
+                ipcRenderer.send('switch-pause-results');
             },
 
             takeScreenshot: function() {
@@ -553,9 +577,11 @@ window.setup = window.setup || {}, // откуда я это взял? как э
             validateResults: function(elm) {
                 let val = $(elm).val();
                 let id = elm.id;
+                //invalidResults = 0;
                 $(".group-pilots-place").each(function () {
                     if ($(this).val() === val && $(this).attr('id') !== id) {
                         $(this).css("color", "red");
+                        //invalidResults = 1;
                     } else {
                         $(this).css("color", "black");
                     }
@@ -564,14 +590,22 @@ window.setup = window.setup || {}, // откуда я это взял? как э
 
             pilotMenu: function( elm ) {
                 let id = $(elm).data('id');
-                if( contextMenu) {
-                    $('.pilot-menu').remove();
+                if( contextMenu !== undefined) {
+                    $('.context-menu').remove();
+                    if( contextMenu.id === id ) {
+                        contextMenu = undefined;
+                        return;
+                    }
+                    contextMenu = undefined;
                 }
                 //get menu from main
                 ipcRenderer.invoke('get-pilot-context-menu', {id:id}).then( result  => {
+                    contextMenu = {type:'pilot', id: id};
                     //todo сделать
+                    console.log('CM');
                     //let html = showPilotContextMenu( result );
-                    $(elm).after('<span class="pilot-menu list-group" style="position:absolute;z-index:10;">' +
+                    let html = 'aaa';
+                    $(elm).after('<span class="pilot-menu list-group context-menu" style="position:absolute;z-index:10;">' +
                         html +
                         '   <a href="#" class="list-group-item list-group-item-action context-menu-item">A second link item</a>'+
                         '</span>');
@@ -663,6 +697,11 @@ window.setup = window.setup || {}, // откуда я это взял? как э
                 //.trigger( "change" );
                 $('.group-pilots-place').change( function () {
                     setup.handler.validateResults(this);
+                    console.log('group-pilots-place change');
+                });
+
+                $( "#themeSelector" ).change( function() {
+                    $("head link#theme").attr('href','./stylesheets/'+getFormThemeVal());
                 });
 
                 $(function() {  // on ready
