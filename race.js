@@ -1,4 +1,5 @@
-
+//todo pilot[x].Slot - to depricated ???
+//todo pilots[x].Channel - to depricated
 
 const Pilot = require('./pilot.js');
 const Store = require('electron-store'); // https://www.npmjs.com/package/electron-store
@@ -112,20 +113,21 @@ module.exports = class Race {
         this.groupCur = this.store.get('groupCur',0);
         this.raceLoop = this.store.get('raceLoop',0);
         this.inCompetition = this.store.get('inCompetition', 0);
+        if( this.inCompetition === 0) {this.groupCur=0; this.raceLoop=0;}
 
     }
 
     getXLSTemplate()
     {
         return [
-            {Num: 1, Name: "John", Slot: 1, Group: 1},
-            {Num: 2, Name: "Tom", Slot: 2, Group: 1},
-            {Num: 3, Name: "John", Slot: 3, Group: 1},
-            {Num: 4, Name: "Tom", Slot: 4, Group: 1},
-            {Num: 5, Name: "John", Slot: 1, Group: 2},
-            {Num: 6, Name: "Tom", Slot: 2, Group: 2},
-            {Num: 7, Name: "John", Slot: 3, Group: 2},
-            {Num: 8, Name: "Tom", Slot: 4, Group: 2},
+            {Num: 1, Name: "Alpha", Slot: 1, Group: 1},
+            {Num: 2, Name: "Bravo", Slot: 2, Group: 1},
+            {Num: 3, Name: "Charlie", Slot: 3, Group: 1},
+            {Num: 4, Name: "Delta", Slot: 4, Group: 1},
+            {Num: 5, Name: "Echo", Slot: 1, Group: 2},
+            {Num: 6, Name: "Foxtrot", Slot: 2, Group: 2},
+            {Num: 7, Name: "Golf", Slot: 3, Group: 2},
+            {Num: 8, Name: "Hotel", Slot: 4, Group: 2},
         ];
     }
 
@@ -197,6 +199,14 @@ module.exports = class Race {
                     result[i][objectKey] = i;
                     return;
                 }
+                if( objectKey === 'Slot' )  {
+                    result[i][objectKey] = pilot[objectKey]-1;
+                    return;
+                }
+                if( objectKey === 'Group' )  {
+                    result[i][objectKey] = pilot[objectKey]-1;
+                    return;
+                }
                 let value = pilot[objectKey];
                 if (index<=3 ) result[i][objectKey] = value;
                 else {
@@ -233,7 +243,7 @@ module.exports = class Race {
                 curLoop = result[i].Results.length;
                 if( curLoop < loop) { // если этот пилот пролетел меньше вылетов, чем предыдущий
                     fSetPos = 1;
-                    groupCur = result[i].Group-1;
+                    groupCur = result[i].Group;
                     raceLoop = curLoop;
                 }
                 else loop = curLoop;
@@ -438,6 +448,9 @@ module.exports = class Race {
     terminateRace() {
         this.inCompetition = 0;
         this.store.set('inCompetition', this.inCompetition);
+        this.setCurrentGroup(0);
+        this.saveCurrentGroup();
+        this.setGroups(); // Перепаковать группы. Они могут быть изменены после прошлой гонки. Например DE8
     }
 
 
@@ -472,6 +485,9 @@ module.exports = class Race {
     validateRaceResultsFromForm( arg )
     {
         // arg[0..3].laps .pos .time
+        // у удаленных пилотов 0/0/0
+        console.log( 'vRRFF' );
+        console.log( arg );
         if( this.rules.savePlace === 0) return 1;
         for( let i=0; i<this.groups[this.groupCur].length; i++ ){
             if( arg[i].pos < 1 || arg[i].pos>4) return 0;
@@ -486,12 +502,13 @@ module.exports = class Race {
     {
         let num;
         for( let i=0; i<this.groups[this.groupCur].length; i++ ){
-            num = this.groups[this.groupCur][i].Num;
-            if( typeof this.pilots[num].Results === 'undefined' ){
-                this.pilots[num].Results = [];
+            if( this.groups[this.groupCur][i] !== undefined ) {
+                num = this.groups[this.groupCur][i].Num;
+                if (typeof this.pilots[num].Results === 'undefined') {
+                    this.pilots[num].Results = [];
+                }
+                this.pilots[num].Results[this.raceLoop] = arg[i];
             }
-            this.pilots[num].Results[this.raceLoop]= arg[i];
-
         }
         console.log('get-results pilots new: ', this.pilots);
         this.store.set('pilots', this.pilots);
@@ -506,8 +523,8 @@ module.exports = class Race {
             result[i] = {};
             result[i].Num = i;
             result[i].Name = pilot.Name;
-            result[i].Channel = pilot.Channel;
-            result[i].Group = pilot.Group;
+            result[i].Slot = pilot.Slot+1;
+            result[i].Group = pilot.Group+1;
             for (let j = 0; j < raceLoop; j++) {
                 if (pilot.Results[j] !== undefined && pilot.Results[j] !== null) {
                     result[i]['P' + j] = pilot.Results[j].pos;
@@ -572,8 +589,10 @@ module.exports = class Race {
         }
         else data.raceName ='';
 
-
+        console.log('ppd');
+        console.log( JSON.stringify(this.groups[this.groupCur]));
         for( let i=0; i<this.groups[this.groupCur].length; i++ ){
+            if( this.groups[this.groupCur][i]===undefined) continue; // удаленные пилоты
             data.group[i] = {};
             data.group[i].name = this.groups[this.groupCur][i]['Name']; //todo можно перевести на this.pilots
             data.group[i].channel = this.settings.channels[i];
@@ -621,6 +640,7 @@ module.exports = class Race {
         if( this.rules.showNext ) {
             data.groupNext = [];
             for( let i=0; i<this.groups[groupNext].length; i++ ){
+                if( this.groups[groupNext][i] === undefined ) continue;
                 data.groupNext[i] = {};
                 data.groupNext[i].name = this.groups[groupNext][i]['Name']; //todo можно перевести на this.pilots
             }
@@ -692,6 +712,86 @@ module.exports = class Race {
 
     isNewLoop(){
         if( (this.rules.groups !== undefined && this.groupCur>=this.rules.groups) || this.groupCur===0) return true;
+    }
+
+    getGroupsWithFreeSlots(groupCur, groupPilot){
+        //если пилот пролетел в этом раунде, то можно переместить в пролетевшие группы
+        //если не пролетел, то в непролетевшие
+        let ret = [];
+        //groupPilot--;
+        /*for( let j=0; j<this.groups.length; j++) {
+            if( this.groups[j].length<4 ) ret.push(j);
+        }*/
+        console.log('ggwfs');
+        console.log(this.groups);
+        console.log('groupCur');
+        console.log(groupCur);
+        for( let j=0; j<this.groups.length; j++) {
+            for( let i=0; i<4; i++) {
+                if( this.groups[j][i]===undefined ){
+                    if( ( groupPilot >= groupCur && j>=groupCur) || (groupPilot < groupCur && j<groupCur)) {
+                        ret.push(j);
+                        break;
+                    }
+                }
+            }
+        }
+        console.log('gGWFS');
+        console.log(ret);
+        return ret;
+    }
+
+    delPilotFromGroup(id){
+        if(!this.rules.moveAllowed) {
+            console.log('удаление запрещено правилами');
+            return false;}
+        let slot = this.getPilotSlot(id);
+        let group = this.getPilotGroup(id);
+        if( this.groups[group][slot].Num !== id) {
+            console.error('delPilotFromGroup: Не соответствие id и Num');
+            return false;
+        }
+        delete( this.groups[group][slot] );
+        //console.log( this.groups[group] );
+        return true;
+    }
+
+    movePilotToGroup(id, newGroup){
+        if(!this.rules.moveAllowed) {
+            console.log('перемещение запрещено правилами');
+            return false;}
+        let curSlot = this.getPilotSlot(id);
+        let curGroup = this.getPilotGroup(id);
+        let newSlot= this.findFreeSlot(newGroup);
+        if( newSlot ) {
+            this.pilots[id].Group = newGroup;
+            this.pilots[id].Slot = newSlot;
+            this.groups[newGroup][newSlot]=this.pilots[id];
+        }
+        else{
+            console.error('нет места в группе'+newGroup);
+            return false;
+        }
+        delete( this.groups[curGroup][curSlot] );
+        return {group: newGroup, slot: newSlot};
+    }
+
+
+    getPilotGroup(id){
+        return this.pilots[id].Group;
+    }
+
+    getPilotSlot(id){
+        return this.pilots[id].Slot;
+    }
+
+    findFreeSlot(group){
+        for( let i=0; i<4; i++) {
+            if( this.groups[group][i]===undefined ){
+                return i;
+            }
+        }
+        return false;
     }
 
 };

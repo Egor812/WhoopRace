@@ -239,7 +239,7 @@ ipcMain.handle( 'submit-race', async (event, arg)=> {
         await obs.connect(arg['obsPort'], arg['obsPassword']);
     }
 
-    race.setGroups(); // Перепаковать группы. Они могут быть изменены после прошлой гонки. Например DE8
+    //race.setGroups(); // Перепаковать группы. Они могут быть изменены после прошлой гонки. Например DE8
     race.clearResults();
     race.resetRaceVars();
 
@@ -369,10 +369,25 @@ ipcMain.handle( 'get-progress',  ()=> {
 });
 
 
-ipcMain.handle( 'get-pilot-context-menu',  ()=> {
+ipcMain.handle( 'get-pilot-context-menu',  (event, arg )=> {
 
-    return { inCompetition: race.inCompetition, raceLoop: race.raceLoop, groupCur: race.groupCur, rulesName: race.getRulesName() };
+    return { pilotGroup: race.getPilotGroup(arg.id),
+        inCompetition: race.inCompetition,
+        raceLoop: race.raceLoop,
+        groupCur: race.groupCur,
+        rulesName: race.getRulesName(),
+        moveAllowed: race.rules.moveAllowed,
+        freeSlots: race.getGroupsWithFreeSlots(race.groupCur, race.getPilotGroup(arg.id)) };
 });
+
+ipcMain.handle( 'del-pilot', (event, arg)=>{
+    return race.delPilotFromGroup(arg.id);
+});
+
+ipcMain.handle( 'move-pilot', (event, arg)=>{
+    return race.movePilotToGroup(arg.id, arg.group);
+});
+
 
 
 // Получаем результаты гонки с формы и сохраняем

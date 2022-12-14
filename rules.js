@@ -10,6 +10,7 @@ const rulesParams =[
         maxPilots: 100, // участников не больше
         showNext: 1,    // показывать на экране приглашения готовящуюся группу
         wavNextNum: 1,   // 1 - вызывается группа {номер}, 0 - вызывается следующая группа
+        moveAllowed: 1,  // можно удалять и перемещать участников
         lapsLimit: 0    // гонка на Х кругов
     },
     {
@@ -23,6 +24,7 @@ const rulesParams =[
         showNext: 1,
         wavNextNum: 1,
         lapsLimit: 0,
+        moveAllowed: 1,  // можно удалять и перемещать участников
         sortIntermediateResults: 1 // сортировать таблицу промежуточных итогов
     },
     {},
@@ -39,6 +41,7 @@ const rulesParams =[
         groups: 1,  // одна рабочая группа, в которой каждый раунд меняем пилотов
         showNext: 0, // не знаем пилотов - нечего показывать
         wavNextNum: 0,
+        moveAllowed: 0,  // можно удалять и перемещать участников
         lapsLimit: 1
     },
     {
@@ -52,6 +55,7 @@ const rulesParams =[
         showNext: 1,
         wavNextNum: 0,
         lapsLimit: 1,
+        moveAllowed: 0,  // можно удалять и перемещать участников
         sortIntermediateResults: 1
     },
 
@@ -72,7 +76,7 @@ class rules
         this.showNext = params.showNext;
         this.wavNextNum = params.wavNextNum;
         this.lapsLimit = params.lapsLimit;
-
+        this.moveAllowed = params.moveAllowed;
     }
 
     findPilotInLoop(pilots, loop, place) {

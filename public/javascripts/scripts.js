@@ -28,7 +28,7 @@ function showMenu(settings, inCompetition, raceLoop, groupCur, rulesName) {
     }
     //if( raceLoop<settings.raceLoops) {
     if( inCompetition && raceLoop<settings.raceLoops) {
-        document.getElementById('race-progress').innerHTML = `${rulesName} Продолжить с раунда ${raceLoop+1} и группы ${groupCur+1}`;
+        document.getElementById('race-progress').innerHTML = `${rulesName}. Продолжить с раунда ${raceLoop+1} и группы ${groupCur+1}`;
         $('#resume-race').show();
     }
     else {
@@ -81,7 +81,8 @@ function prerace(data) {
 
     for( let i=0; i<4; i++ ){
         elmPilots[i] = $('#pilot-'+(i+1)+' .name');
-        if( i<data.group.length ) {
+        //if( i<data.group.length ) {
+        if( data.group[i]!==undefined ) {
             $('#pilot-'+(i+1)).show();
             elmPilots[i].text( data.group[i].name );
             $('#pilot-' + (i + 1) + ' > .ch').text( data.group[i].channel );
@@ -95,7 +96,7 @@ function prerace(data) {
     if( data.groupNext !== undefined ) {
         for( let i=0; i<4; i++ ){
             elmPilotsNext[i] = $('#pilot-next-'+(i+1));
-            if( i<data.groupNext.length ) {
+            if( i<data.groupNext.length && data.groupNext[i]!==undefined ) {
                 elmPilotsNext[i].show();
                 elmPilotsNext[i].text( data.groupNext[i].name );
             }
@@ -288,15 +289,22 @@ function showPilotsAll(pilotsG, channels) {
     let num=0;
     for (let group = 0; group < pilotsG.length; group++) {
         x += '<p> Группа ' + (group+1) + ':';
-        for (let ii = 0; ii < pilotsG[group].length; ii++) {
-            x += '<span style="display: inline-block;"><span class="setup-pilots-badge badge badge-warning" data-id="' + pilotsG[group][ii]['Num'] + '">' + pilotsG[group][ii]['Name'] + ' <sup>'+ channels[ii] +'</sup></span></span>';
+        for (let ii = 0; ii < 4; ii++) {
+            if( pilotsG[group][ii] === undefined) {
+                x += `<span style="display: inline-block;"><span class="setup-pilots-badge badge badge-secondary" data-group="${group}" data-slot="${ii}">&nbsp; <sup>${channels[ii]}</sup></span></span>`;
+                continue;
+            }
+            x += '<span style="display: inline-block;">'+
+                 `<span class="setup-pilots-badge badge badge-warning" data-id="${pilotsG[group][ii]['Num']}" data-group="${group}" data-slot="${ii}">` +
+                 pilotsG[group][ii]['Name'] +
+                 ' <sup>'+ channels[ii] +'</sup></span></span>';
             num++;
         }
         x += '</p>';
     }
 
     x += '</p>';
-    x = 'Загружено пилотов : ' + num +'<p>' + x;
+    x = `Загружено пилотов : ${num}<p>` + x;
     HTMLOUT.innerHTML = x;
 }
 
@@ -590,6 +598,7 @@ window.setup = window.setup || {}, // откуда я это взял? как э
 
             pilotMenu: function( elm ) {
                 let id = $(elm).data('id');
+                console.log(id);
                 if( contextMenu !== undefined) {
                     $('.context-menu').remove();
                     if( contextMenu.id === id ) {
@@ -598,17 +607,70 @@ window.setup = window.setup || {}, // откуда я это взял? как э
                     }
                     contextMenu = undefined;
                 }
+                if( id === undefined ) return; // нет меню у удаленных
                 //get menu from main
                 ipcRenderer.invoke('get-pilot-context-menu', {id:id}).then( result  => {
-                    contextMenu = {type:'pilot', id: id};
-                    //todo сделать
-                    console.log('CM');
-                    //let html = showPilotContextMenu( result );
-                    let html = 'aaa';
-                    $(elm).after('<span class="pilot-menu list-group context-menu" style="position:absolute;z-index:10;">' +
-                        html +
-                        '   <a href="#" class="list-group-item list-group-item-action context-menu-item">A second link item</a>'+
-                        '</span>');
+                    if( result.moveAllowed ) {
+                        contextMenu = {type: 'pilot', id: id};
+                        //let html = showPilotContextMenu( result );
+                        let html = '<a href="#" class="list-group-item list-group-item-action context-menu-item del-pilot" data-pilot='+id+'>Удалить</a>';
+                        for(let i=0; i<result.freeSlots.length; i++){
+                            html+= '<a href="#" class="list-group-item list-group-item-action context-menu-item move-pilot" data-pilot='+id+' data-group='+result.freeSlots[i]+'>В группу '+(result.freeSlots[i]+1)+'</a>';
+                        }
+                        $(elm).after('<span class="pilot-menu list-group context-menu" style="position:absolute;z-index:10;">' + html + '</span>');
+                    }
+                });
+            },
+
+            delPilot: function( elm ) {
+                let id = $(elm).data('pilot');
+                ipcRenderer.invoke('del-pilot', {id:id}).then( result => {
+                    console.log('result'+result);
+                    if(result){
+                        $( ".setup-pilots-badge" ).each(function() {
+                            if( $( this ).data('id')===id ) {
+                                $( this ).addClass('badge-secondary');
+                                $( this ).removeClass('badge-warning');
+                                $( this ).removeAttr('data-id');
+                                $( this ).removeData('id');
+                                $( this ).html('&nbsp;');
+                                return false;
+                            }
+                        });
+                    }
+                });
+                $('.context-menu').remove();
+                contextMenu = undefined;
+            },
+
+            movePilot: function( elm ) {
+                let id = $(elm).data('pilot');
+                let group = $(elm).data('group');
+                let html;
+                ipcRenderer.invoke('move-pilot', {id:id, group: group}).then( result => {
+                    if(result) {
+                        let elm = $( ".setup-pilots-badge" );
+                        elm.each(function() {
+                            if( $( this ).data('id')===id ) {
+                                $( this ).addClass('badge-secondary');
+                                $( this ).removeClass('badge-warning');
+                                html = $( this ).html();
+                                $( this ).html('&nbsp;');
+                                return false;
+                            }
+                        });
+                        elm.each(function() {
+                            if( $( this ).data('group')===result.group && $( this ).data('slot')===result.slot ) {
+                                $( this ).addClass('badge-warning');
+                                $( this ).removeClass('badge-secondary');
+                                $( this ).html(html);
+                                $( this ).data('id',id);
+                                return false;
+                            }
+                        });
+                    }
+                    $('.context-menu').remove();
+                    contextMenu = undefined
                 });
             },
 
@@ -697,11 +759,19 @@ window.setup = window.setup || {}, // откуда я это взял? как э
                 //.trigger( "change" );
                 $('.group-pilots-place').change( function () {
                     setup.handler.validateResults(this);
-                    console.log('group-pilots-place change');
                 });
 
                 $( "#themeSelector" ).change( function() {
                     $("head link#theme").attr('href','./stylesheets/'+getFormThemeVal());
+                });
+
+                $('#list-pilots').on('click', '.del-pilot', function () {
+                    setup.handler.delPilot(this);
+                });
+
+                $('#list-pilots').on('click', '.move-pilot', function () {
+                    console.log('click');
+                    setup.handler.movePilot(this);
                 });
 
                 $(function() {  // on ready
