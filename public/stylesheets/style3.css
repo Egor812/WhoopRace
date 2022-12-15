@@ -43,6 +43,7 @@ a {
 .pilots > .name {
     font-size: 2em;
     font-weight: bold;
+    cursor: pointer;
 }
 
 .pilots > .ch{

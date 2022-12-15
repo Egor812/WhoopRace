@@ -45,6 +45,7 @@ a {
 .pilots > .name {
     font-size: 3em;
     font-weight: bold;
+    cursor: pointer;
 }
 
 .pilots > .ch{

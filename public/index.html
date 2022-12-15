@@ -23,6 +23,7 @@
   <audio id="wav-invite" src="./data/invite.wav" preload="auto"></audio>
   <audio id="wav-invitenext" src="./data/invitenext.wav" preload="auto"></audio>
   <audio id="wav-20secondstogo" src="./data/20secondstogo.wav" preload="auto"></audio>
+  <audio id="wav-60secondstogo" src="./data/60secondstogo.wav" preload="auto"></audio>
 </div>
 
 <div id="logo" style="position:fixed; right:15px; bottom: 0; font-weight: 700; font-size: 4rem;">
@@ -254,7 +255,7 @@
     <div id="round" class="badge badge-secondary"> </div>
     <div id="round-name" class="badge badge-secondary" style="display:none"> </div>
     <div id="group-pilots" class="row">
-        <div id="pilot-1" class="pilots col">
+        <div id="pilot-1" data-slot="0" class="pilots col">
           <span class='name'></span>
           <span class='group-pilots-results' style="display: none">
             <input type="number" class="form-control group-pilots-laps" id="gpl-1" title="круги" style="width: 50px; display:inline;" value="0">
@@ -266,7 +267,7 @@
           <span class="place"></span>
           <span class="judge bottom"></span>
         </div>
-        <div id="pilot-2" class="pilots col">
+        <div id="pilot-2" data-slot="1" class="pilots col">
           <span class='name'></span>
           <span class='group-pilots-results' style="display: none">
             <input type="number" class="form-control group-pilots-laps" id="gpl-2" title="круги" style="width: 50px; display:inline;" value="0">
@@ -279,7 +280,7 @@
           <span class="judge bottom"></span>
         </div>
         <div class="w-100"></div>
-        <div id="pilot-3" class="pilots col">
+        <div id="pilot-3" data-slot="2" class="pilots col">
           <span class='name'></span>
           <span class='group-pilots-results' style="display: none">
             <input type="number" class="form-control group-pilots-laps" id="gpl-3" title="круги" style="width: 50px; display:inline;" value="0">
@@ -291,7 +292,7 @@
           <span class="place"></span>
           <span class="judge bottom"></span>
         </div>
-        <div id="pilot-4" class="pilots col">
+        <div id="pilot-4" data-slot="3" class="pilots col">
           <span class='name'></span>
           <span class='group-pilots-results' style="display: none">
             <input type="number" class="form-control group-pilots-laps" id="gpl-4" title="круги" style="width: 50px; display:inline;" value="0">

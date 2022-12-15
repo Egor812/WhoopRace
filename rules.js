@@ -315,7 +315,7 @@ class rulesDoubleElemenation8 extends rules
         });
         return {loop: max, group: 0};
     }
-};
+}
 
 class rulesBattle4 extends rules
 {

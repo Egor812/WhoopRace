@@ -1,5 +1,10 @@
 'use strict';
 
+// todo поменять местами двух человек в группе (?)
+// todo bug DE8 Ручное заполнение Время 0 секунд. Проверить статистику
+// todo Речевое "Финиш"
+// todo Речевое "60 секунд до старта"
+
 const isDev = process.env.APP_DEV ? (process.env.APP_DEV.trim() === "true") : false;
 
 let timeInterval; // таймер race и prerace
@@ -257,7 +262,7 @@ ipcMain.handle( 'submit-race', async (event, arg)=> {
 
 // подготовка к возобновлению гонки
 ipcMain.handle( 'resume-race', async ()=> {
-    if( race.isLastRaceLoop() ) {
+    if( race.isOverLimitRaceLoop() ) {
         const { dialog } = require('electron');
         dialog.showMessageBoxSync({ 'message': 'Гонка завершена', 'type':'info'});
         return 0;
@@ -344,7 +349,7 @@ ipcMain.on( 'screenshot-results',  (event, arg)=> {
 Получить результаты для статистики вызванной из меню
  */
 ipcMain.on( 'get-stat',  ()=> {
-    if( race.isLastRaceLoop() ) {
+    if( race.isOverLimitRaceLoop() ) {
         //ИТОГОВЫЙ ИТОГ
         if( race.areResultsNeeded() ) {
             let res = race.calcIntermediateResults(1);
@@ -371,13 +376,24 @@ ipcMain.handle( 'get-progress',  ()=> {
 
 ipcMain.handle( 'get-pilot-context-menu',  (event, arg )=> {
 
-    return { pilotGroup: race.getPilotGroup(arg.id),
-        inCompetition: race.inCompetition,
-        raceLoop: race.raceLoop,
-        groupCur: race.groupCur,
-        rulesName: race.getRulesName(),
-        moveAllowed: race.rules.moveAllowed,
-        freeSlots: race.getGroupsWithFreeSlots(race.groupCur, race.getPilotGroup(arg.id)) };
+    if( arg.id ) {
+        return {
+            //pilotGroup: race.getPilotGroup(arg.id),
+            //inCompetition: race.inCompetition,
+            //raceLoop: race.raceLoop,
+            //groupCur: race.groupCur,
+            //rulesName: race.getRulesName(),
+            moveAllowed: race.rules.moveAllowed,
+            freeSlots: race.getGroupsWithFreeSlots(race.groupCur, race.getPilotGroup(arg.id))
+        };
+    }
+    else{
+        return {
+            moveAllowed: race.rules.moveAllowed,
+            freePilots: race.findPilotsWithoutGroup(),
+        };
+
+    }
 });
 
 ipcMain.handle( 'del-pilot', (event, arg)=>{
@@ -388,6 +404,9 @@ ipcMain.handle( 'move-pilot', (event, arg)=>{
     return race.movePilotToGroup(arg.id, arg.group);
 });
 
+ipcMain.handle( 'pilotPenalty', (event, arg)=>{
+    return race.setPenalty(arg);
+});
 
 
 // Получаем результаты гонки с формы и сохраняем
@@ -495,6 +514,10 @@ function initializeClock( counter, endFunc = function(){return 0}) {
                 if( race.timeForWarning20s() ){
                     mainWindow.webContents.send('20togo');
                 }
+                else if( race.timeForWarning60s() ){
+                    mainWindow.webContents.send('60togo');
+                }
+
             }
         }
         else {
@@ -582,7 +605,6 @@ function saveRaceReq() {
 }
 
 
-
 function showIntermediateResults( res ) {
     mainWindow.webContents.send('show-results', { results : res, round : race.raceLoop, raceLoops: race.settings.raceLoops });
 }
@@ -598,8 +620,8 @@ function showFinalResults( res ) {
 
 function nextRace() {
     // переключить группу
-    race.setAndSaveNextGroupAndLoop();
-    if( race.isNewLoop() ) {
+    let isNewLoop = race.setAndSaveNextGroupAndLoop();
+    if( isNewLoop ) {
         if( race.isCompetitionOver() ) {
             //ИТОГОВЫЙ ИТОГ
             if( race.areResultsNeeded() ) {

@@ -7,6 +7,7 @@ const elmMenu = $('#menu');
 const elmResults = $('#results');
 const elmRerace = $('#rerace');
 const elmStartNow = $('#start-now');
+const elmPilotsList =   $('#list-pilots');
 let contextMenu; // открыто любое контекстное меню
 //let invalidResults = 0;
 
@@ -84,6 +85,7 @@ function prerace(data) {
         //if( i<data.group.length ) {
         if( data.group[i]!==undefined ) {
             $('#pilot-'+(i+1)).show();
+            setPenaltyColor(elmPilots[i], data.group[i].penalty );
             elmPilots[i].text( data.group[i].name );
             $('#pilot-' + (i + 1) + ' > .ch').text( data.group[i].channel );
             $('#pilot-' + (i + 1) + ' > .stat').text( data.group[i].resultTxt[0] );
@@ -396,6 +398,29 @@ function getResultsFromForm() {
     return results;
 }
 
+function drawEmptyPilotBage(id) {
+    $( ".setup-pilots-badge" ).each(function() {
+        if( $( this ).data('id')===id ) {
+            $( this ).addClass('badge-secondary');
+            $( this ).removeClass('badge-warning');
+            $( this ).removeAttr('data-id');
+            $( this ).removeData('id');
+            $( this ).html('&nbsp;');
+            return false;
+        }
+    });
+}
+
+function setPenaltyColor(elm, i){
+    switch(i){
+        case 0: elm.css( "color", "white" );
+            break;
+        case 1: elm.css( "color", "yellow" );
+            break;
+        case 2: elm.css( "color", "orange" );
+            break;
+    }
+}
 
 // IPC
 
@@ -412,6 +437,9 @@ ipcRenderer.on('20togo', ()=> {
     document.getElementById('wav-20secondstogo').play();
 });
 
+ipcRenderer.on('60togo', ()=> {
+    document.getElementById('wav-60secondstogo').play();
+});
 ipcRenderer.on('finish', (event,arg)=> {
     if( arg.withoutTVP ) document.getElementById('wav-finish').play();
 });
@@ -598,6 +626,8 @@ window.setup = window.setup || {}, // откуда я это взял? как э
 
             pilotMenu: function( elm ) {
                 let id = $(elm).data('id');
+                let groupId = $(elm).data('group');
+                let slot = $(elm).data('slot');
                 console.log(id);
                 if( contextMenu !== undefined) {
                     $('.context-menu').remove();
@@ -607,19 +637,28 @@ window.setup = window.setup || {}, // откуда я это взял? как э
                     }
                     contextMenu = undefined;
                 }
-                if( id === undefined ) return; // нет меню у удаленных
-                //get menu from main
+
                 ipcRenderer.invoke('get-pilot-context-menu', {id:id}).then( result  => {
                     if( result.moveAllowed ) {
                         contextMenu = {type: 'pilot', id: id};
+                        let html = '';
                         //let html = showPilotContextMenu( result );
-                        let html = '<a href="#" class="list-group-item list-group-item-action context-menu-item del-pilot" data-pilot='+id+'>Удалить</a>';
-                        for(let i=0; i<result.freeSlots.length; i++){
-                            html+= '<a href="#" class="list-group-item list-group-item-action context-menu-item move-pilot" data-pilot='+id+' data-group='+result.freeSlots[i]+'>В группу '+(result.freeSlots[i]+1)+'</a>';
+                        if( id !== undefined) html += '<a href="#" class="list-group-item list-group-item-action context-menu-item del-pilot" data-pilot='+id+'>Удалить</a>';
+                        if( result.freeSlots !== undefined ) {
+                            for (let i = 0; i < result.freeSlots.length; i++) {
+                                html += '<a href="#" class="list-group-item list-group-item-action context-menu-item move-pilot" data-pilot=' + id + ' data-group=' + result.freeSlots[i] + '>В группу ' + (result.freeSlots[i] + 1) + '</a>';
+                            }
+                        }
+                        if( result.freePilots !== undefined ){
+                            for (let i = 0; i < result.freePilots.length; i++) {
+                                html += '<a href="#" class="list-group-item list-group-item-action context-menu-item move-pilot" data-pilot=' + result.freePilots[i].id + ' data-group=' + groupId + ' data-slot=' + slot + '>+ ' + result.freePilots[i].name + '</a>';
+                            }
+
                         }
                         $(elm).after('<span class="pilot-menu list-group context-menu" style="position:absolute;z-index:10;">' + html + '</span>');
                     }
                 });
+
             },
 
             delPilot: function( elm ) {
@@ -627,16 +666,7 @@ window.setup = window.setup || {}, // откуда я это взял? как э
                 ipcRenderer.invoke('del-pilot', {id:id}).then( result => {
                     console.log('result'+result);
                     if(result){
-                        $( ".setup-pilots-badge" ).each(function() {
-                            if( $( this ).data('id')===id ) {
-                                $( this ).addClass('badge-secondary');
-                                $( this ).removeClass('badge-warning');
-                                $( this ).removeAttr('data-id');
-                                $( this ).removeData('id');
-                                $( this ).html('&nbsp;');
-                                return false;
-                            }
-                        });
+                        drawEmptyPilotBage(id);
                     }
                 });
                 $('.context-menu').remove();
@@ -646,24 +676,15 @@ window.setup = window.setup || {}, // откуда я это взял? как э
             movePilot: function( elm ) {
                 let id = $(elm).data('pilot');
                 let group = $(elm).data('group');
-                let html;
                 ipcRenderer.invoke('move-pilot', {id:id, group: group}).then( result => {
                     if(result) {
+                        drawEmptyPilotBage(id);
                         let elm = $( ".setup-pilots-badge" );
-                        elm.each(function() {
-                            if( $( this ).data('id')===id ) {
-                                $( this ).addClass('badge-secondary');
-                                $( this ).removeClass('badge-warning');
-                                html = $( this ).html();
-                                $( this ).html('&nbsp;');
-                                return false;
-                            }
-                        });
                         elm.each(function() {
                             if( $( this ).data('group')===result.group && $( this ).data('slot')===result.slot ) {
                                 $( this ).addClass('badge-warning');
                                 $( this ).removeClass('badge-secondary');
-                                $( this ).html(html);
+                                $( this ).html(`${result.name} <sup>${result.channel}</sup>`);
                                 $( this ).data('id',id);
                                 return false;
                             }
@@ -722,8 +743,15 @@ window.setup = window.setup || {}, // откуда я это взял? как э
                 elmStartNow.click( function () {
                     setup.handler.startNow();
                 });
-                $('#list-pilots').on('click', '.setup-pilots-badge', function () {
+                elmPilotsList.on('click', '.setup-pilots-badge', function () {
                     setup.handler.pilotMenu(this);
+                });
+                elmPilotsList.on('click', '.del-pilot', function () {
+                    setup.handler.delPilot(this);
+                });
+                elmPilotsList.on('click', '.move-pilot', function () {
+                    console.log('click');
+                    setup.handler.movePilot(this);
                 });
 
                 addEventListener("keyup", function(event) {
@@ -765,14 +793,15 @@ window.setup = window.setup || {}, // откуда я это взял? как э
                     $("head link#theme").attr('href','./stylesheets/'+getFormThemeVal());
                 });
 
-                $('#list-pilots').on('click', '.del-pilot', function () {
-                    setup.handler.delPilot(this);
-                });
 
-                $('#list-pilots').on('click', '.move-pilot', function () {
-                    console.log('click');
-                    setup.handler.movePilot(this);
+                $('.pilots > .name').click( function () {
+                    ipcRenderer.invoke('pilotPenalty', $(this).parent().data("slot") ).then( (result) => {
+                        setPenaltyColor($(this), result);
+                    })
                 });
+                /*$('.group-pilots-results').click( function (event) {
+                    event.stopPropagation();
+                });*/
 
                 $(function() {  // on ready
                     ipcRenderer.invoke('get-progress').then( result  => {

@@ -65,8 +65,8 @@ module.exports = class Race {
     pilots; // массив пилотов
     groups; // массив групп пилотов
     //todo groups - массив pilots. Избыточная дублирующаяся информация. Вроде, сейчас используется только Num и Name
-    raceLoop; // текущий раунд
-    groupCur; // текущая группа
+    raceLoop; // текущий раунд 0..n
+    groupCur; // текущая группа 0..n
     inCompetition; // создана ли гонка
     rules;
     settings; // массив настроек гонки
@@ -197,6 +197,7 @@ module.exports = class Race {
             Object.keys(pilot).map(function(objectKey, index) {
                 if( objectKey === 'Num' )  { // Запишем Num от 0 и попорядку
                     result[i][objectKey] = i;
+                    result[i]['penalty'] = 0;
                     return;
                 }
                 if( objectKey === 'Slot' )  {
@@ -284,7 +285,8 @@ module.exports = class Race {
                     pilotsG[pilotsObj[i]['Group']] = [];
                 }
                 //Добавить пилота в группу
-                pilotsG[pilotsObj[i]['Group']].push(pilotsObj[i]);
+                //pilotsG[pilotsObj[i]['Group']].push(pilotsObj[i]);
+                pilotsG[ pilotsObj[i]['Group'] ][ pilotsObj[i]['Slot'] ] = pilotsObj[i];
             }
             // Удалить пустые группы - сделать порядок 0,1...
             for (let i = 0; i < pilotsG.length; i++) {
@@ -368,12 +370,12 @@ module.exports = class Race {
     // arg - номер правил
     checkRulesPilotsAmount(arg)
     {
-        console.log('arg:'+arg);
-        console.log('rulesParams:');
-        console.log(rules.rulesParams[arg]);
-        console.log('pilots:' + this.pilots.length);
+        //console.log('arg:'+arg);
+        //console.log('rulesParams:');
+        //console.log(rules.rulesParams[arg]);
+        //console.log('pilots:' + this.pilots.length);
         if( this.pilots.length<rules.rulesParams[arg].minPilots || this.pilots.length>rules.rulesParams[arg].maxPilots ) return false;
-        console.log('checkRulesPilotsAmount - success');
+        //console.log('checkRulesPilotsAmount - success');
         return true;
     }
 
@@ -383,10 +385,14 @@ module.exports = class Race {
     }
 
     arePilotsPresent() {
-        // todo проверить.
         console.log(this.groups.length);
         if (this.groups.length === 0) return false;
-        return true;
+        for(let i=0; i<this.groups.length; i++) {
+            for (let j = 0; j < 4; j++) {
+                if(this.groups[i][j]!==undefined) return true;
+            }
+        }
+        return false;
     }
 
     processFormSettings( settings )
@@ -420,7 +426,10 @@ module.exports = class Race {
     clearResults() {
         this.pilots.forEach(function (item) {
             item.Results = [];
+            item.penalty=0;
         });
+        console.log('CR');
+        console.log(this.pilots);
     }
 
     resetRaceVars()
@@ -434,8 +443,10 @@ module.exports = class Race {
         this.pause = 0;
     }
 
-    isLastRaceLoop()
+    isOverLimitRaceLoop()
     {
+        //raceLoop 0..n
+        //raceLoops 1..(n+1)
         if( this.settings.raceLoops && this.raceLoop>=this.settings.raceLoops ) return 1;
         return 0;
     }
@@ -596,6 +607,7 @@ module.exports = class Race {
             data.group[i] = {};
             data.group[i].name = this.groups[this.groupCur][i]['Name']; //todo можно перевести на this.pilots
             data.group[i].channel = this.settings.channels[i];
+            data.group[i].penalty = this.pilots[this.groups[this.groupCur][i]['Num']].penalty;
             data.group[i].resultTxt = ['', ''];
             console.log( this.rules.saveLaps );
             if( this.rules.saveLaps ) {
@@ -633,11 +645,13 @@ module.exports = class Race {
             }
         }
 
-        let groupNext = this.groupCur + 1;
-        let groupMax = this.groups.length;
-        if( groupNext >= groupMax ) groupNext = 0;
+        let groupNext = this._findNextAliveGroup();
+        if( groupNext===false) return false;
+        //let groupNext = this.groupCur + 1;
+        //let groupMax = this.groups.length;
+        //if( groupNext >= groupMax ) groupNext = 0;
         data.showNext = this.rules.showNext;
-        if( this.rules.showNext ) {
+        if( this.rules.showNext && this.raceLoop<(this.settings.loops-1)) {
             data.groupNext = [];
             for( let i=0; i<this.groups[groupNext].length; i++ ){
                 if( this.groups[groupNext][i] === undefined ) continue;
@@ -651,6 +665,27 @@ module.exports = class Race {
 
         return data;
     }
+
+    _findNextAliveGroup() {
+        let empty;
+        let groupNext = this.groupCur + 1;
+        let groupMax = this.groups.length;
+        for(let j=0; j<groupMax; j++) {
+            if (groupNext >= groupMax) groupNext = 0;
+            empty=1;
+            for(let i=0; i<4; i++){
+                if( this.groups[groupNext][i]!==undefined){
+                    empty=0;
+                    break;
+                }
+            }
+            if(!empty) return groupNext;
+            groupNext++;
+        }
+        return false;
+    }
+
+
 
     setTimer(val)
     {
@@ -675,6 +710,11 @@ module.exports = class Race {
         if( this.inCompetition===1 && this.inRace===0 && this.timerCur===20) return true;
     }
 
+    timeForWarning60s() {
+        if( this.inCompetition===1 && this.inRace===0 && this.timerCur===60) return true;
+    }
+
+
     inRaceOff(){
         this.inRace=0;
     }
@@ -689,20 +729,35 @@ module.exports = class Race {
 
 
     setAndSaveNextGroupAndLoop() {
-        this.groupCur++;
+        let fNextLoop=0;
+        // правила с одной группой
+        if( this.rules.groups !== undefined ){
+            this.groupCur++;
+            if( this.groupCur >= this.rules.groups) {
+                this.groupCur=0;
+                fNextLoop=1;
+            }
+        }
+        else {
+            let nextGroup = this._findNextAliveGroup();
+            if( nextGroup<=this.groupCur) fNextLoop=1;
+            this.groupCur=nextGroup;
+        }
 
         // следующий раунд
-        if( (this.rules.groups !== undefined && this.groupCur >= this.rules.groups) || this.groupCur >= this.groups.length) {
-            this.groupCur = 0;
+        //if( (this.rules.groups !== undefined && this.groupCur >= this.rules.groups) || this.groupCur >= this.groups.length) {
+        if( fNextLoop ) {
             this.raceLoop++;
             if ( this.rules.seedGroup !== undefined) {
                 this.groups[0] = this.rules.seedGroup(this.pilots, this.raceLoop);
             }
             this.store.set('groupCur', this.groupCur);
             this.store.set('raceLoop', this.raceLoop);
+            return 1;
         } else {
             // следующая группа
             this.store.set('groupCur', this.groupCur);
+            return 0;
         }
     }
 
@@ -710,9 +765,9 @@ module.exports = class Race {
         if( this.settings.raceLoops && this.raceLoop>=this.settings.raceLoops ) return true;
     }
 
-    isNewLoop(){
+    /*isNewLoop(){
         if( (this.rules.groups !== undefined && this.groupCur>=this.rules.groups) || this.groupCur===0) return true;
-    }
+    }*/
 
     getGroupsWithFreeSlots(groupCur, groupPilot){
         //если пилот пролетел в этом раунде, то можно переместить в пролетевшие группы
@@ -752,17 +807,20 @@ module.exports = class Race {
             return false;
         }
         delete( this.groups[group][slot] );
+        this.pilots[id].Group = false;
+        this.pilots[id].Slot = false;
+        this.savePilots();
         //console.log( this.groups[group] );
         return true;
     }
 
-    movePilotToGroup(id, newGroup){
+    movePilotToGroup(id, newGroup, newSlot=false){
         if(!this.rules.moveAllowed) {
             console.log('перемещение запрещено правилами');
             return false;}
         let curSlot = this.getPilotSlot(id);
         let curGroup = this.getPilotGroup(id);
-        let newSlot= this.findFreeSlot(newGroup);
+        if( newSlot === false ) newSlot= this.findFreeSlot(newGroup);
         if( newSlot ) {
             this.pilots[id].Group = newGroup;
             this.pilots[id].Slot = newSlot;
@@ -772,8 +830,9 @@ module.exports = class Race {
             console.error('нет места в группе'+newGroup);
             return false;
         }
-        delete( this.groups[curGroup][curSlot] );
-        return {group: newGroup, slot: newSlot};
+        if( curGroup && curSlot ) delete( this.groups[curGroup][curSlot] );
+        this.savePilots();
+        return {group: newGroup, slot: newSlot, name:this.groups[newGroup][newSlot].Name, channel:this.settings.channels[newSlot]};
     }
 
 
@@ -785,6 +844,10 @@ module.exports = class Race {
         return this.pilots[id].Slot;
     }
 
+    getPilotName(id){
+        return this.pilots[id].Name;
+    }
+
     findFreeSlot(group){
         for( let i=0; i<4; i++) {
             if( this.groups[group][i]===undefined ){
@@ -792,6 +855,25 @@ module.exports = class Race {
             }
         }
         return false;
+    }
+
+    findPilotsWithoutGroup(){
+        let pilots = [];
+        for(let i=0; i<this.pilots.length; i++){
+            if(this.getPilotGroup(i)===false) pilots.push({id:i, name: this.getPilotName(i)} );
+        }
+        return pilots;
+    }
+
+    setPenalty(slot){
+        console.log("SP");
+        console.log(slot);
+        let id = this.groups[this.groupCur][slot].Num;
+        console.log(id);
+        console.log(this.pilots[id]);
+        this.pilots[id].penalty++;
+        if( this.pilots[id].penalty>2) this.pilots[id].penalty=0;
+        return this.pilots[id].penalty;
     }
 
 };
