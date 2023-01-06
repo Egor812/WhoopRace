@@ -12,14 +12,8 @@
 # Требования
 **Tiny View Plus от FixFly** для засечки
 
-**OBS 26.1 или новее** для работы с проектором или внешним экраном. 
+**OBS 28 или новее** для работы с проектором или внешним экраном. 
 (linux: https://obsproject.com/wiki/install-instructions#linux)
-
-**WebSockets API for OBS Studio. 4.9.0 или новее** - https://github.com/Palakis/obs-websocket 
-
-win: https://github.com/Palakis/obs-websocket/releases/download/4.9.0/obs-websocket-4.9.0-Windows-Installer.exe
-
-linux: https://github.com/Palakis/obs-websocket/releases/download/4.9.0/obs-websocket_4.9.0-1_amd64.deb
 
 # Возможности WR
 
@@ -65,7 +59,7 @@ linux: https://github.com/Palakis/obs-websocket/releases/download/4.9.0/obs-webs
 * Set AR Lap timer mode: Normal
 * Set wait for lap after time limit: по желанию
 * Set minimum lap time: поставить, чтобы оставить возможность ручной корректировки ошибки засечки
-* Set staggered Start: **off**
+* Set staggered Start: **off** - время начинает считаться сразу после старта, а не после прохождения стартовых ворот
 
 Выйти из TVP, чтобы разгрузить систему
 
@@ -91,7 +85,7 @@ linux: https://github.com/Palakis/obs-websocket/releases/download/4.9.0/obs-webs
 
 ## Ошибки засечки
 
-* В TVP добавлять (5-6-7-8) или вычитать круги (Alt 5-6-7-8).
+* В TVP добавлять (5-6-7-8) или (F1-F2-F3-F4). Вычитать круги (Alt 5-6-7-8) или (F5-F6-F7-F8).
 * Или после гонки исправить данные на экране результатов
 
 
@@ -261,6 +255,8 @@ VI: Первый и второй из IV, первый и второй из 5. �
 #### bootstrap
 bootstrap.min.css и bootstrap.min.css.map копируем в проект вручную
 
+## Change log
+17/12/2022 Переход на OBS 28 и obs-websocket 5.0.2 с их пятой версией протокола.
 
 
 <!---linux:
@@ -390,3 +386,4 @@ Project->Properties->General->Platform ToolSet 142
 **todo** нет иконки
 
 
+тест
